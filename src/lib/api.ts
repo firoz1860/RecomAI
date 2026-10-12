@@ -23,7 +23,7 @@ const baseMessages: Record<RecommendationErrorCode, string> = {
   quota: 'This account has no available credits or quota. Add credits or billing for your provider and try again.',
   network: 'We could not reach the recommendation service. Check your connection and retry.',
   invalid_response: 'The AI returned an unexpected response. Please try again.',
-  no_matches: 'No products in our catalog matched that request.',
+  no_matches: 'The AI could not suggest a suitable product. Try adding a budget, category, or must-have feature.',
   bad_request: 'The request was invalid. Please try again.',
   server: 'Something went wrong while generating recommendations.'
 }
