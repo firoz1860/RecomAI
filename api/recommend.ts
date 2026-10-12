@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { generateRecommendations } from './recommend-core'
+import { generateRecommendations } from './recommend-core.js'
 
 function readHeader(req: VercelRequest, name: string): string {
   const value = req.headers[name]

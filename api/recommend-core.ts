@@ -1,5 +1,5 @@
 import OpenAI from 'openai'
-import { defaultProviderId, getProvider } from '../src/lib/providers'
+import { defaultProviderId, getProvider } from '../src/lib/providers.js'
 
 export type ErrorCode =
   | 'empty_preference'
