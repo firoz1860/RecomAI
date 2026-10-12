@@ -1,35 +1,42 @@
 import { useEffect, useId, useState } from 'react'
 import { Modal } from './Modal'
 import { CheckIcon, ExternalLinkIcon, EyeIcon, EyeOffIcon, KeyIcon } from './icons'
+import { providers, getProvider } from '../lib/providers'
+import type { ProviderId } from '../lib/providers'
 
 interface ApiKeyModalProps {
   open: boolean
   onClose: () => void
-  onSave: (key: string, remember: boolean) => void
+  onSave: (key: string, providerId: ProviderId, remember: boolean) => void
   onClear: () => void
   hasKey: boolean
   remember: boolean
+  providerId: ProviderId
 }
 
-export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }: ApiKeyModalProps) {
+export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, providerId }: ApiKeyModalProps) {
+  const [draftProvider, setDraftProvider] = useState<ProviderId>(providerId)
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [rememberForTab, setRememberForTab] = useState(remember)
   const [touched, setTouched] = useState(false)
   const fieldId = useId()
   const titleId = useId()
+  const selectId = useId()
 
   useEffect(() => {
     if (open) {
+      setDraftProvider(providerId)
       setValue('')
       setReveal(false)
       setRememberForTab(remember)
       setTouched(false)
     }
-  }, [open, remember])
+  }, [open, remember, providerId])
 
+  const provider = getProvider(draftProvider) ?? providers[0]
   const trimmed = value.trim()
-  const looksValid = trimmed.startsWith('sk') && trimmed.length >= 20
+  const looksValid = trimmed.length >= 8
   const showError = touched && trimmed.length > 0 && !looksValid
 
   function handleSave() {
@@ -37,7 +44,7 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }
     if (!looksValid) {
       return
     }
-    onSave(trimmed, rememberForTab)
+    onSave(trimmed, draftProvider, rememberForTab)
     onClose()
   }
 
@@ -45,14 +52,40 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }
     <Modal
       open={open}
       onClose={onClose}
-      title="Connect your OpenAI API key"
-      description="Your key is used only to generate recommendations for your request. It is never stored on our server."
+      title="Connect an AI provider"
+      description="Pick a provider and paste its API key. Your key is used only to generate recommendations for your request and is never stored on our server."
       labelledBy={titleId}
     >
       <div className="space-y-4">
         <div>
+          <label htmlFor={selectId} className="mb-1.5 block text-sm font-medium text-slate-700">
+            Provider
+          </label>
+          <select
+            id={selectId}
+            value={draftProvider}
+            onChange={(event) => {
+              setDraftProvider(event.target.value as ProviderId)
+              setValue('')
+              setTouched(false)
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-800 transition focus-ring"
+          >
+            {providers.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+                {item.freeTier ? ' (free tier)' : ''}
+              </option>
+            ))}
+          </select>
+          {provider.freeTier && (
+            <p className="mt-1.5 text-xs text-emerald-600">This provider offers a free tier, so no billing is needed to start.</p>
+          )}
+        </div>
+
+        <div>
           <label htmlFor={fieldId} className="mb-1.5 block text-sm font-medium text-slate-700">
-            OpenAI API key
+            {provider.label} API key
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -72,7 +105,7 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }
                   handleSave()
                 }
               }}
-              placeholder="sk..."
+              placeholder={provider.keyPlaceholder}
               className="w-full rounded-xl border border-slate-200 bg-white px-9 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus-ring"
               aria-invalid={showError}
               aria-describedby={showError ? `${fieldId}-error` : undefined}
@@ -88,7 +121,7 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }
           </div>
           {showError && (
             <p id={`${fieldId}-error`} className="mt-1.5 text-xs text-rose-600">
-              That does not look like a valid OpenAI key.
+              That key looks too short. Please paste the full key.
             </p>
           )}
         </div>
@@ -109,12 +142,12 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember }
         </label>
 
         <a
-          href="https://platform.openai.com/api-keys"
+          href={provider.keysUrl}
           target="_blank"
           rel="noreferrer noopener"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 transition hover:text-brand-700 focus-ring"
         >
-          Get OpenAI API key
+          Get {provider.label} API key
           <ExternalLinkIcon className="h-4 w-4" />
         </a>
 

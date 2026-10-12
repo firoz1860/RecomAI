@@ -1,8 +1,5 @@
-import type {
-  Product,
-  RecommendationErrorCode,
-  RecommendationResponse
-} from './types'
+import type { Product, RecommendationErrorCode, RecommendationResponse } from './types'
+import type { ProviderId } from './providers'
 
 export class RecommendationRequestError extends Error {
   code: RecommendationErrorCode
@@ -18,12 +15,12 @@ export class RecommendationRequestError extends Error {
 
 const baseMessages: Record<RecommendationErrorCode, string> = {
   empty_preference: 'Please describe what you are looking for first.',
-  missing_key: 'Add your OpenAI API key to get recommendations.',
-  invalid_key: 'Your OpenAI API key was rejected. It may be incorrect, expired, or revoked. Please reconnect a valid key.',
-  permission: 'This API key does not have access to the required model. Check your OpenAI project permissions.',
-  model: 'The configured model is not available for this key. Try a different model or key.',
+  missing_key: 'Add an API key to get recommendations.',
+  invalid_key: 'Your API key was rejected. It may be incorrect, expired, or revoked. Please reconnect a valid key.',
+  permission: 'This API key does not have access to the selected model. Check your provider project permissions.',
+  model: 'The selected model is not available for this key. Try a different model or provider.',
   rate_limit: 'You are sending requests too quickly. Please wait a moment and retry.',
-  quota: 'Your OpenAI account has no available quota. Add credits or billing in the OpenAI dashboard and try again.',
+  quota: 'This account has no available credits or quota. Add credits or billing for your provider and try again.',
   network: 'We could not reach the recommendation service. Check your connection and retry.',
   invalid_response: 'The AI returned an unexpected response. Please try again.',
   no_matches: 'No products in our catalog matched that request.',
@@ -42,6 +39,7 @@ export function messageForCode(code: RecommendationErrorCode, retryAfter?: numbe
 interface RecommendPayload {
   preference: string
   products: Product[]
+  provider: ProviderId
 }
 
 export async function requestRecommendations(
@@ -55,7 +53,8 @@ export async function requestRecommendations(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-openai-api-key': apiKey
+        'x-api-key': apiKey,
+        'x-provider': payload.provider
       },
       body: JSON.stringify(payload)
     })

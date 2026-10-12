@@ -13,6 +13,8 @@ import { useApiKey } from '../hooks/useApiKey'
 import { useRecommendations } from '../hooks/useRecommendations'
 import { products } from '../data/products'
 import { matchesCategory, matchesSearch, sortProducts } from '../lib/utils'
+import { getProvider } from '../lib/providers'
+import type { ProviderId } from '../lib/providers'
 import type {
   CategoryFilter as CategoryFilterValue,
   Product,
@@ -24,7 +26,7 @@ import type {
 const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission', 'model']
 
 export function Home() {
-  const { apiKey, hasKey, remember, saveKey, clearKey } = useApiKey()
+  const { apiKey, providerId, hasKey, remember, saveKey, clearKey } = useApiKey()
   const recommendations = useRecommendations(products)
 
   const [preference, setPreference] = useState('')
@@ -58,7 +60,7 @@ export function Home() {
     }
     setPreferenceError('')
     if (recommendations.isCached(trimmed)) {
-      void recommendations.run(trimmed, apiKey)
+      void recommendations.run(trimmed, apiKey, providerId)
       return
     }
     if (!hasKey) {
@@ -66,7 +68,7 @@ export function Home() {
       setKeyModalOpen(true)
       return
     }
-    void recommendations.run(trimmed, apiKey)
+    void recommendations.run(trimmed, apiKey, providerId)
   }
 
   function handleSelectRecent(value: string) {
@@ -74,12 +76,12 @@ export function Home() {
     startRequest(value)
   }
 
-  function handleSaveKey(key: string, rememberForTab: boolean) {
-    saveKey(key, rememberForTab)
+  function handleSaveKey(key: string, provider: ProviderId, rememberForTab: boolean) {
+    saveKey(key, provider, rememberForTab)
     if (pendingPreference) {
       const next = pendingPreference
       setPendingPreference(null)
-      void recommendations.run(next, key)
+      void recommendations.run(next, key, provider)
     }
   }
 
@@ -89,7 +91,8 @@ export function Home() {
   }
 
   const code = recommendations.errorCode
-  const billingUrl = 'https://platform.openai.com/settings/organization/billing'
+  const currentProvider = getProvider(providerId)
+  const billingUrl = currentProvider?.billingUrl ?? 'https://platform.openai.com/settings/organization/billing'
   const needsKey = code !== null && keyErrorCodes.includes(code)
   let errorActionLabel: string | undefined
   let errorAction: (() => void) | undefined
@@ -98,7 +101,7 @@ export function Home() {
     errorActionLabel = code === 'missing_key' ? 'Connect API key' : 'Update API key'
     errorAction = handleManageKey
   } else if (code === 'quota') {
-    errorActionLabel = 'Add credits in OpenAI'
+    errorActionLabel = `Add credits in ${currentProvider?.label ?? 'your provider'}`
     errorActionHref = billingUrl
   } else if (code === 'no_matches') {
     errorActionLabel = undefined
@@ -109,7 +112,11 @@ export function Home() {
 
   return (
     <div className="min-h-screen">
-      <Header hasKey={hasKey} onManageKey={handleManageKey} />
+      <Header
+        hasKey={hasKey}
+        providerLabel={currentProvider?.label ?? 'Provider'}
+        onManageKey={handleManageKey}
+      />
 
       <Hero
         preference={preference}
@@ -214,6 +221,7 @@ export function Home() {
         onClear={clearKey}
         hasKey={hasKey}
         remember={remember}
+        providerId={providerId}
       />
 
       <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />

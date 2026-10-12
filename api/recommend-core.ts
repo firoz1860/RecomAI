@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { defaultProviderId, getProvider } from '../src/lib/providers'
 
 export type ErrorCode =
   | 'empty_preference'
@@ -16,6 +17,7 @@ export type ErrorCode =
 export interface CoreInput {
   method: string
   apiKey: string
+  provider?: string
   body: unknown
 }
 
@@ -74,14 +76,44 @@ function errorResult(status: number, code: ErrorCode, error: string, retryAfter?
   return { status, body }
 }
 
-export async function generateRecommendations({ method, apiKey, body }: CoreInput): Promise<CoreResult> {
+function extractJson(content: string): unknown {
+  try {
+    return JSON.parse(content)
+  } catch {
+    const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i)
+    if (fenced) {
+      try {
+        return JSON.parse(fenced[1])
+      } catch {
+        return null
+      }
+    }
+    const start = content.indexOf('{')
+    const end = content.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(content.slice(start, end + 1))
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+}
+
+export async function generateRecommendations({ method, apiKey, provider, body }: CoreInput): Promise<CoreResult> {
   if (method !== 'POST') {
     return { status: 405, body: { code: 'bad_request', error: 'Method not allowed.' }, allow: 'POST' }
   }
 
   const key = apiKey.trim()
   if (!key) {
-    return errorResult(401, 'missing_key', 'An OpenAI API key is required.')
+    return errorResult(401, 'missing_key', 'An API key is required.')
+  }
+
+  const selected = getProvider(provider ?? defaultProviderId) ?? getProvider(defaultProviderId)
+  if (!selected) {
+    return errorResult(400, 'bad_request', 'An unknown AI provider was requested.')
   }
 
   const payload = (body ?? {}) as Record<string, unknown>
@@ -101,20 +133,21 @@ export async function generateRecommendations({ method, apiKey, body }: CoreInpu
   }
 
   const validIds = new Set(catalog.map((item) => item.id))
-  const model = process.env.RECOMAI_OPENAI_MODEL || 'gpt-4o-mini'
+  const model = process.env[selected.envModelVar] || selected.defaultModel
 
   try {
-    const client = new OpenAI({ apiKey: key })
+    const client = new OpenAI({ apiKey: key, baseURL: selected.baseUrl })
     const completion = await client.chat.completions.create({
       model,
       temperature: 0.2,
-      response_format: { type: 'json_object' },
+      ...(selected.supportsJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
       messages: [
         {
           role: 'system',
           content:
             'You are a product recommendation engine. You may only recommend products from the provided catalog. ' +
-            'Return strict JSON with the shape {"summary": string, "recommendations": [{"productId": string, "score": number, "reason": string}]}. ' +
+            'Respond with raw JSON only and no markdown. The JSON shape is ' +
+            '{"summary": string, "recommendations": [{"productId": string, "score": number, "reason": string}]}. ' +
             'Use only productId values that exist in the catalog. Return at most three recommendations ordered by best fit. ' +
             'Score is an integer from 0 to 100. If nothing fits, return an empty recommendations array.'
         },
@@ -130,10 +163,8 @@ export async function generateRecommendations({ method, apiKey, body }: CoreInpu
       return errorResult(502, 'invalid_response', 'The AI returned an empty response.')
     }
 
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(content)
-    } catch {
+    const parsed = extractJson(content)
+    if (parsed === null) {
       return errorResult(502, 'invalid_response', 'The AI returned malformed data.')
     }
 
@@ -145,7 +176,7 @@ export async function generateRecommendations({ method, apiKey, body }: CoreInpu
 
     return { status: 200, body: { summary, recommendations } }
   } catch (error) {
-    return mapOpenAiError(error)
+    return mapProviderError(error)
   }
 }
 
@@ -231,29 +262,34 @@ function parseRetryAfter(error: unknown): number | undefined {
   return undefined
 }
 
-function mapOpenAiError(error: unknown): CoreResult {
+function mapProviderError(error: unknown): CoreResult {
   const status =
     typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : 0
   const signals = readField(error, 'code') + ' ' + readField(error, 'type') + ' ' + readField(error, 'message')
 
-  if (signals.includes('insufficient_quota') || signals.includes('quota') || signals.includes('billing')) {
+  if (
+    signals.includes('insufficient_quota') ||
+    signals.includes('quota') ||
+    signals.includes('billing') ||
+    signals.includes('credit')
+  ) {
     return errorResult(
       402,
       'quota',
-      'Your OpenAI account has no available quota. Add credits or billing in the OpenAI dashboard and try again.'
+      'This account has no available credits or quota. Add credits or billing for your provider and try again.'
     )
   }
 
-  if (status === 401 || signals.includes('invalid_api_key') || signals.includes('invalid api key')) {
-    return errorResult(401, 'invalid_key', 'Your OpenAI API key was rejected. It may be incorrect, expired, or revoked.')
+  if (status === 401 || signals.includes('invalid_api_key') || signals.includes('invalid api key') || signals.includes('authentication')) {
+    return errorResult(401, 'invalid_key', 'Your API key was rejected. It may be incorrect, expired, or revoked.')
   }
 
   if (status === 403 || signals.includes('permission') || signals.includes('does not have access')) {
-    return errorResult(403, 'permission', 'This API key does not have access to the required model.')
+    return errorResult(403, 'permission', 'This API key does not have access to the selected model.')
   }
 
-  if (status === 404 || signals.includes('model_not_found') || signals.includes('does not exist')) {
-    return errorResult(404, 'model', 'The configured model is not available for this key.')
+  if (status === 404 || signals.includes('model_not_found') || signals.includes('does not exist') || signals.includes('not found')) {
+    return errorResult(404, 'model', 'The selected model is not available for this key.')
   }
 
   if (status === 429) {

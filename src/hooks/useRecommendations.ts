@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { requestRecommendations, RecommendationRequestError } from '../lib/api'
 import { clampScore } from '../lib/utils'
 import { clearStoredHistory, loadHistory, normalizePreference, persistHistory } from '../lib/history'
+import type { ProviderId } from '../lib/providers'
 import type {
   HistoryEntry,
   Product,
@@ -45,7 +46,7 @@ export interface RecentSearch {
 interface UseRecommendationsResult extends RecommendationState {
   recent: RecentSearch[]
   isCached: (preference: string) => boolean
-  run: (preference: string, apiKey: string) => Promise<void>
+  run: (preference: string, apiKey: string, provider: ProviderId) => Promise<void>
   reset: () => void
   clearHistory: () => void
 }
@@ -73,7 +74,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
   )
 
   const run = useCallback(
-    async (preference: string, apiKey: string) => {
+    async (preference: string, apiKey: string, provider: ProviderId) => {
       const trimmed = preference.trim()
       const normalized = normalizePreference(trimmed)
       setState((prev) => ({
@@ -104,7 +105,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
       }
 
       try {
-        const response = await requestRecommendations({ preference: trimmed, products: catalog }, apiKey)
+        const response = await requestRecommendations({ preference: trimmed, products: catalog, provider }, apiKey)
         const resolved = resolveRecommendations(response.recommendations, catalog)
 
         if (resolved.length === 0) {

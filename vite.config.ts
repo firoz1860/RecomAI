@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { generateRecommendations } from './api/recommend-core'
 
+function headerValue(req: IncomingMessage, name: string): string {
+  const value = req.headers[name]
+  return (Array.isArray(value) ? value[0] : value ?? '').toString().trim()
+}
+
 function recommendApiPlugin(): Plugin {
   const middleware = async (req: IncomingMessage, res: ServerResponse) => {
     const chunks: Buffer[] = []
@@ -18,12 +23,18 @@ function recommendApiPlugin(): Plugin {
         parsed = null
       }
     }
-    const headerValue = req.headers['x-openai-api-key']
-    const apiKey = (Array.isArray(headerValue) ? headerValue[0] : headerValue ?? '').toString().trim()
+
+    const apiKey = headerValue(req, 'x-api-key') || headerValue(req, 'x-openai-api-key')
+    const headerProvider = headerValue(req, 'x-provider')
+    const bodyProvider =
+      parsed && typeof parsed === 'object' && typeof (parsed as { provider?: unknown }).provider === 'string'
+        ? (parsed as { provider: string }).provider
+        : ''
 
     const result = await generateRecommendations({
       method: req.method ?? 'GET',
       apiKey,
+      provider: headerProvider || bodyProvider,
       body: parsed
     })
 
