@@ -118,7 +118,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
             summary: '',
             results: [],
             errorCode: 'no_matches',
-            errorMessage: 'No products in our catalog matched that request.',
+            errorMessage: 'The AI could not suggest a suitable product. Try adding a budget, category, or must-have feature.',
             retryAfter: null,
             lastPreference: trimmed,
             fromCache: false
@@ -141,7 +141,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
           timestamp: Date.now()
         }
         setHistory((prev) => {
-          const next = [entry, ...prev.filter((h) => normalizePreference(h.preference) !== normalized)].slice(
+          const next = [entry, ...prev.filter((h) => !(normalizePreference(h.preference) === normalized && h.provider === provider && h.model === model))].slice(
             0,
             maxHistory
           )
