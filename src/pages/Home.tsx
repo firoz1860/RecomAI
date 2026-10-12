@@ -26,7 +26,7 @@ import type {
 const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission']
 
 export function Home() {
-  const { apiKey, providerId, hasKey, remember, saveKey, clearKey } = useApiKey()
+  const { apiKey, providerId, modelId, hasKey, remember, saveKey, clearKey } = useApiKey()
   const recommendations = useRecommendations(products)
 
   const [preference, setPreference] = useState('')
@@ -60,7 +60,7 @@ export function Home() {
     }
     setPreferenceError('')
     if (recommendations.isCached(trimmed)) {
-      void recommendations.run(trimmed, apiKey, providerId)
+      void recommendations.run(trimmed, apiKey, providerId, modelId)
       return
     }
     if (!hasKey) {
@@ -68,7 +68,7 @@ export function Home() {
       setKeyModalOpen(true)
       return
     }
-    void recommendations.run(trimmed, apiKey, providerId)
+    void recommendations.run(trimmed, apiKey, providerId, modelId)
   }
 
   function handleSelectRecent(value: string) {
@@ -76,12 +76,12 @@ export function Home() {
     startRequest(value)
   }
 
-  function handleSaveKey(key: string, provider: ProviderId, rememberForTab: boolean) {
-    saveKey(key, provider, rememberForTab)
+  function handleSaveKey(key: string, provider: ProviderId, model: string, rememberForTab: boolean) {
+    saveKey(key, provider, model, rememberForTab)
     if (pendingPreference) {
       const next = pendingPreference
       setPendingPreference(null)
-      void recommendations.run(next, key, provider)
+      void recommendations.run(next, key, provider, model)
     }
   }
 
@@ -223,8 +223,10 @@ export function Home() {
         onSave={handleSaveKey}
         onClear={clearKey}
         hasKey={hasKey}
+        apiKey={apiKey}
         remember={remember}
         providerId={providerId}
+        model={modelId}
       />
 
       <ProductDetailModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />

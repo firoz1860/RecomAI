@@ -27,8 +27,8 @@ export function Header({ hasKey, providerLabel, onManageKey }: HeaderProps) {
             aria-hidden="true"
           />
           <KeyIcon className="h-4 w-4 text-slate-400 group-hover:text-brand-500" />
-          <span className="hidden sm:inline">{hasKey ? `${providerLabel} connected` : 'Connect API key'}</span>
-          <span className="sm:hidden">{hasKey ? 'Connected' : 'Connect'}</span>
+          <span className="hidden sm:inline">{hasKey ? `${providerLabel} key saved` : 'Connect API key'}</span>
+          <span className="sm:hidden">{hasKey ? 'Key saved' : 'Connect'}</span>
         </button>
       </div>
     </header>

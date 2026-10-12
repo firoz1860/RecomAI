@@ -46,7 +46,7 @@ export interface RecentSearch {
 interface UseRecommendationsResult extends RecommendationState {
   recent: RecentSearch[]
   isCached: (preference: string) => boolean
-  run: (preference: string, apiKey: string, provider: ProviderId) => Promise<void>
+  run: (preference: string, apiKey: string, provider: ProviderId, model: string) => Promise<void>
   reset: () => void
   clearHistory: () => void
 }
@@ -74,7 +74,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
   )
 
   const run = useCallback(
-    async (preference: string, apiKey: string, provider: ProviderId) => {
+    async (preference: string, apiKey: string, provider: ProviderId, model: string) => {
       const trimmed = preference.trim()
       const normalized = normalizePreference(trimmed)
       setState((prev) => ({
@@ -105,7 +105,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
       }
 
       try {
-        const response = await requestRecommendations({ preference: trimmed, products: catalog, provider }, apiKey)
+        const response = await requestRecommendations({ preference: trimmed, products: catalog, provider, model }, apiKey)
         const resolved = resolveRecommendations(response.recommendations, catalog)
 
         if (resolved.length === 0) {

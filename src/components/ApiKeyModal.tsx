@@ -7,15 +7,18 @@ import type { ProviderId } from '../lib/providers'
 interface ApiKeyModalProps {
   open: boolean
   onClose: () => void
-  onSave: (key: string, providerId: ProviderId, remember: boolean) => void
+  onSave: (key: string, providerId: ProviderId, model: string, remember: boolean) => void
   onClear: () => void
   hasKey: boolean
+  apiKey: string
   remember: boolean
   providerId: ProviderId
+  model: string
 }
 
-export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, providerId }: ApiKeyModalProps) {
+export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, apiKey, remember, providerId, model }: ApiKeyModalProps) {
   const [draftProvider, setDraftProvider] = useState<ProviderId>(providerId)
+  const [draftModel, setDraftModel] = useState(model)
   const [value, setValue] = useState('')
   const [reveal, setReveal] = useState(false)
   const [rememberForTab, setRememberForTab] = useState(remember)
@@ -27,16 +30,18 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
   useEffect(() => {
     if (open) {
       setDraftProvider(providerId)
-      setValue('')
+      setDraftModel(model)
+      setValue(apiKey)
       setReveal(false)
       setRememberForTab(remember)
       setTouched(false)
     }
-  }, [open, remember, providerId])
+  }, [open, remember, providerId, model, apiKey])
 
   const provider = getProvider(draftProvider) ?? providers[0]
   const trimmed = value.trim()
-  const looksValid = trimmed.length >= 8
+  const trimmedModel = draftModel.trim()
+  const looksValid = trimmed.length >= 8 && trimmedModel.length > 0 && trimmedModel.length <= 200
   const showError = touched && trimmed.length > 0 && !looksValid
 
   function handleSave() {
@@ -44,7 +49,7 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
     if (!looksValid) {
       return
     }
-    onSave(trimmed, draftProvider, rememberForTab)
+    onSave(trimmed, draftProvider, trimmedModel, rememberForTab)
     onClose()
   }
 
@@ -65,7 +70,9 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
             id={selectId}
             value={draftProvider}
             onChange={(event) => {
-              setDraftProvider(event.target.value as ProviderId)
+              const nextProvider = event.target.value as ProviderId
+              setDraftProvider(nextProvider)
+              setDraftModel(getProvider(nextProvider)?.defaultModel ?? '')
               setValue('')
               setTouched(false)
             }}
@@ -78,8 +85,21 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
               </option>
             ))}
           </select>
+          <label htmlFor={`${selectId}-model`} className="mb-1.5 mt-3 block text-sm font-medium text-slate-700">
+            Model ID
+          </label>
+          <input
+            id={`${selectId}-model`}
+            value={draftModel}
+            onChange={(event) => setDraftModel(event.target.value)}
+            maxLength={200}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={provider.defaultModel}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-sm text-slate-900 transition placeholder:text-slate-400 focus-ring"
+          />
           <p className="mt-1.5 text-xs text-slate-500">
-            Model: <code className="font-mono">{provider.defaultModel}</code>
+            Default: <code className="font-mono">{provider.defaultModel}</code>. You can enter any model enabled for your key.
           </p>
           {provider.freeTier ? (
             <p className="mt-1.5 text-xs text-emerald-600">

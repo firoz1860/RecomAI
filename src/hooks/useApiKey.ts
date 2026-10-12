@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { defaultProviderId, isProviderId } from '../lib/providers'
+import { defaultProviderId, getProvider, isProviderId } from '../lib/providers'
 import type { ProviderId } from '../lib/providers'
 
 const keyStorageKey = 'recomai_api_key'
 const providerStorageKey = 'recomai_provider'
+const modelStorageKey = 'recomai_model'
 
 interface UseApiKeyResult {
   apiKey: string
   providerId: ProviderId
+  modelId: string
   hasKey: boolean
   remember: boolean
-  saveKey: (value: string, providerId: ProviderId, remember: boolean) => void
+  saveKey: (value: string, providerId: ProviderId, modelId: string, remember: boolean) => void
   clearKey: () => void
 }
 
@@ -37,10 +39,17 @@ function readStoredProvider(): ProviderId {
 export function useApiKey(): UseApiKeyResult {
   const [apiKey, setApiKey] = useState<string>('')
   const [providerId, setProviderId] = useState<ProviderId>(defaultProviderId)
+  const [modelId, setModelId] = useState<string>(getProvider(defaultProviderId)?.defaultModel ?? '')
   const [remember, setRemember] = useState<boolean>(false)
 
   useEffect(() => {
-    setProviderId(readStoredProvider())
+    const storedProvider = readStoredProvider()
+    setProviderId(storedProvider)
+    try {
+      setModelId(window.localStorage.getItem(modelStorageKey) || getProvider(storedProvider)?.defaultModel || '')
+    } catch {
+      setModelId(getProvider(storedProvider)?.defaultModel ?? '')
+    }
     const stored = readStoredKey()
     if (stored) {
       setApiKey(stored)
@@ -48,13 +57,15 @@ export function useApiKey(): UseApiKeyResult {
     }
   }, [])
 
-  const saveKey = useCallback((value: string, provider: ProviderId, rememberForTab: boolean) => {
+  const saveKey = useCallback((value: string, provider: ProviderId, model: string, rememberForTab: boolean) => {
     const trimmed = value.trim()
     setApiKey(trimmed)
     setProviderId(provider)
+    setModelId(model.trim())
     setRemember(rememberForTab)
     try {
       window.localStorage.setItem(providerStorageKey, provider)
+      window.localStorage.setItem(modelStorageKey, model.trim())
     } catch {
       setProviderId(provider)
     }
@@ -82,6 +93,7 @@ export function useApiKey(): UseApiKeyResult {
   return {
     apiKey,
     providerId,
+    modelId,
     hasKey: apiKey.length > 0,
     remember,
     saveKey,

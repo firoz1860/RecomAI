@@ -15,7 +15,7 @@ The catalog is the single source of truth. The AI may return only product ids th
 
 - Responsive catalog of 22 fictional products across smartphones, laptops, headphones, smartwatches, tablets and accessories
 - Natural language preference input with example prompt chips
-- API key modal with provider-specific links to official key pages, a password field with show and hide, and an optional remember for this tab control
+- API key modal with provider-specific links, editable model IDs, a masked key field, and an optional remember for this tab control
 - Search, category filter and sorting
 - Product detail view
 - Up to three recommendations with a match score and a reason
@@ -58,7 +58,8 @@ Request body:
 ```
 {
   "preference": "I want a phone under $500",
-  "products": []
+  "products": [],
+  "model": "openai/gpt-oss-120b"
 }
 ```
 
@@ -84,7 +85,7 @@ Response shape:
 3. `vercel build` and `vercel deploy` to create a preview deployment
 4. Promote to production from the Vercel dashboard after review
 
-No server environment secret is required for visitor keys because each selected provider key is supplied per request. The optional `RECOMAI_OPENAI_MODEL` variable overrides the model and defaults to `gpt-4o-mini`.
+No server environment secret is required for visitor keys because each selected provider key is supplied per request. The model selected in the key dialog is sent with each request and takes precedence over server defaults.
 
 ## Documentation
 
@@ -93,30 +94,30 @@ No server environment secret is required for visitor keys because each selected 
 
 ## AI providers
 
-RecomAI works with several providers. Pick one in the API key modal and paste that provider's key. OpenRouter's default Grok model is free to use; free models are rate limited and availability can change.
+RecomAI works with several providers. Pick one in the API key modal and paste that provider's key. Groq, Gemini and OpenRouter offer limited free usage or free models; quotas and model availability can change. The selected model ID is editable in the key dialog, so it can match the models enabled for your provider account.
 
 | Provider | Default model | Free tier | Get a key |
 | --- | --- | --- | --- |
 | OpenAI | gpt-4o-mini | no | https://platform.openai.com/api-keys |
-| Groq | openai/gpt-oss-120b | no | https://console.groq.com/keys |
+| Groq | openai/gpt-oss-120b | yes, with limits | https://console.groq.com/keys |
 | Google Gemini | gemini-3.5-flash-lite | yes | https://aistudio.google.com/apikey |
 | OpenRouter | x-ai/grok-4.1-fast:free | yes | https://openrouter.ai/keys |
-| Anthropic Claude | claude-3-5-haiku-20241022 | no | https://console.anthropic.com/settings/keys |
+| Anthropic Claude | claude-haiku-5-5 | no | https://console.anthropic.com/settings/keys |
 | xAI Grok | grok-4.7 | no | https://console.x.ai |
 | Mistral | mistral-small-latest | no | https://console.mistral.ai/api-keys |
 
-The key you enter is sent only in the request header and is never stored on the server. It stays in memory, or in sessionStorage when you choose remember for this tab. The provider choice is stored in localStorage as a preference, and your saved search results are cached in localStorage. The key itself is never written to localStorage.
+The key you enter is sent only in the request header and is never stored on the server. It stays in memory, or in sessionStorage when you choose remember for this tab. The provider choice and model ID are stored in localStorage as preferences, and saved search results are cached in localStorage. The key itself is never written to localStorage.
 
 ## Environment variables
 
-No environment variable is required to run or deploy RecomAI, because the AI key is supplied by the visitor per request. The only optional variables override the default model for each provider:
+No environment variable is required to run or deploy RecomAI, because the AI key is supplied by the visitor per request. Optional `RECOMAI_*_MODEL` variables provide fallback models for direct API callers that omit `model`. The web UI always sends its selected model, so these server defaults cannot silently replace the model shown in the dialog:
 
 ```
 RECOMAI_OPENAI_MODEL=gpt-4o-mini
 RECOMAI_GROQ_MODEL=openai/gpt-oss-120b
 RECOMAI_GOOGLE_MODEL=gemini-3.5-flash-lite
 RECOMAI_OPENROUTER_MODEL=x-ai/grok-4.1-fast:free
-RECOMAI_ANTHROPIC_MODEL=claude-3-5-haiku-20241022
+RECOMAI_ANTHROPIC_MODEL=claude-haiku-5-5
 RECOMAI_XAI_MODEL=grok-4.7
 RECOMAI_MISTRAL_MODEL=mistral-small-latest
 ```
@@ -139,4 +140,4 @@ Accept the detected settings (framework Vite, build command npm run build, outpu
 vercel --prod
 ```
 
-No environment variable needs to be set for a working deployment. Add any RECOMAI_*_MODEL variable in the Vercel project settings only if you want to change a default model.
+No environment variable needs to be set for a working deployment. Set a `RECOMAI_*_MODEL` value only to choose a fallback for requests that do not specify a model.
