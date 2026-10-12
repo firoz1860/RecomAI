@@ -118,21 +118,13 @@ export async function generateRecommendations({ method, apiKey, provider, body }
 
   const payload = (body ?? {}) as Record<string, unknown>
   const preference = typeof payload.preference === 'string' ? payload.preference.trim() : ''
-  const rawProducts = Array.isArray(payload.products) ? payload.products : null
+  const rawProducts = Array.isArray(payload.products) ? payload.products : []
 
-  if (!rawProducts) {
-    return errorResult(400, 'bad_request', 'A product catalog is required.')
-  }
   if (!preference) {
     return errorResult(400, 'empty_preference', 'A preference description is required.')
   }
 
-  const catalog = rawProducts.map(toCatalogItem).filter((item): item is CatalogItem => item !== null)
-  if (catalog.length === 0) {
-    return errorResult(400, 'bad_request', 'The product catalog was empty or invalid.')
-  }
-
-  const validIds = new Set(catalog.map((item) => item.id))
+  const catalog = rawProducts.slice(0, 40).map(toCatalogItem).filter((item): item is CatalogItem => item !== null)
   const requestedModel = typeof payload.model === 'string' ? payload.model.trim().slice(0, 200) : ''
   const model = requestedModel || (selected.id === 'google' ? selected.defaultModel : process.env[selected.envModelVar] || selected.defaultModel)
 
@@ -151,7 +143,7 @@ export async function generateRecommendations({ method, apiKey, provider, body }
       try {
         completion = await client.chat.completions.create({
           model: candidateModel,
-          max_tokens: 700,
+          max_tokens: 1600,
           ...(selected.id === 'google' ? { reasoning_effort: 'low' as const } : {}),
       ...(selected.id === 'anthropic' ? {} : { temperature: 0.2 }),
       ...(selected.supportsJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
@@ -159,11 +151,10 @@ export async function generateRecommendations({ method, apiKey, provider, body }
         {
           role: 'system',
           content:
-            'You are a product recommendation engine. You may only recommend products from the provided catalog. ' +
-            'Respond with raw JSON only and no markdown. The JSON shape is ' +
-            '{"summary": string, "recommendations": [{"productId": string, "score": number, "reason": string}]}. ' +
-            'Use only productId values that exist in the catalog. Return at most three recommendations ordered by best fit. ' +
-            'Score is an integer from 0 to 100. If nothing fits, return an empty recommendations array.'
+            'You are a product discovery assistant. Recommend up to three specific real-world products that fit the request, including products that are not in the optional reference catalog. ' +
+            'Use the catalog only as inspiration; never restrict recommendations to its ids. Do not invent merchant URLs, ratings, review counts, or claim live availability. Prices and specifications are approximate and must be presented as estimates. ' +
+            'Respond with raw JSON only and no markdown, using this shape: {"summary": string, "recommendations": [{"product": {"name": string, "brand": string, "category": string, "price": number, "description": string, "features": string[], "tags": string[]}, "score": number, "reason": string}]}. ' +
+            'Use category values smartphones, laptops, headphones, smartwatches, tablets, or accessories. Use price 0 when you cannot provide a reasonable estimate. Return at most three distinct products ordered by best fit. Score is an integer from 0 to 100.'
         },
         {
           role: 'user',
@@ -194,7 +185,7 @@ export async function generateRecommendations({ method, apiKey, provider, body }
       return errorResult(502, 'invalid_response', 'The AI returned malformed data.')
     }
 
-    const recommendations = normalize(parsed, validIds)
+    const recommendations = normalize(parsed)
     const summary =
       parsed && typeof parsed === 'object' && typeof (parsed as { summary?: unknown }).summary === 'string'
         ? (parsed as { summary: string }).summary
@@ -207,9 +198,8 @@ export async function generateRecommendations({ method, apiKey, provider, body }
 }
 
 function normalize(
-  parsed: unknown,
-  validIds: Set<string>
-): Array<{ productId: string; score: number; reason: string }> {
+  parsed: unknown
+): Array<{ productId: string; product: Record<string, unknown>; score: number; reason: string }> {
   if (!parsed || typeof parsed !== 'object') {
     return []
   }
@@ -217,26 +207,56 @@ function normalize(
   if (!Array.isArray(list)) {
     return []
   }
+  const categories = new Set(['smartphones', 'laptops', 'headphones', 'smartwatches', 'tablets', 'accessories'])
+  const palettes = ['indigo', 'violet', 'sky', 'teal', 'amber', 'rose', 'slate']
+  const cleanText = (value: unknown, max = 240): string =>
+    typeof value === 'string' ? value.replace(/[<>]/g, '').trim().slice(0, max) : ''
   const seen = new Set<string>()
-  const output: Array<{ productId: string; score: number; reason: string }> = []
+  const output: Array<{ productId: string; product: Record<string, unknown>; score: number; reason: string }> = []
   for (const entry of list) {
-    if (!entry || typeof entry !== 'object') {
-      continue
-    }
+    if (!entry || typeof entry !== 'object') continue
     const record = entry as Record<string, unknown>
-    const productId = typeof record.productId === 'string' ? record.productId : ''
-    if (!validIds.has(productId) || seen.has(productId)) {
-      continue
-    }
+    if (!record.product || typeof record.product !== 'object') continue
+    const source = record.product as Record<string, unknown>
+    const name = cleanText(source.name, 120)
+    if (!name) continue
+    const brand = cleanText(source.brand, 80) || 'Recommended product'
+    const productId = (brand + '-' + name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 100)
+    if (seen.has(productId)) continue
     seen.add(productId)
+    const categoryValue = cleanText(source.category, 40).toLowerCase()
+    const category = categories.has(categoryValue) ? categoryValue : 'accessories'
+    const priceValue = Number(source.price)
+    const price = Number.isFinite(priceValue) && priceValue > 0 ? Math.min(Math.round(priceValue), 500000) : 0
+    const features = Array.isArray(source.features)
+      ? source.features.filter((value): value is string => typeof value === 'string').map((value) => cleanText(value, 100)).filter(Boolean).slice(0, 6)
+      : []
+    const tags = Array.isArray(source.tags)
+      ? source.tags.filter((value): value is string => typeof value === 'string').map((value) => cleanText(value, 40)).filter(Boolean).slice(0, 8)
+      : []
+    const product = {
+      id: productId,
+      name,
+      brand,
+      category,
+      price,
+      rating: 0,
+      reviewCount: 0,
+      image: palettes[output.length % palettes.length],
+      description: cleanText(source.description, 500) || 'A product suggested by AI based on your preferences.',
+      features,
+      tags,
+      featured: false,
+      priceIsEstimate: true,
+      sourceUrl: 'https://www.google.com/search?tbm=shop&q=' + encodeURIComponent(brand + ' ' + name)
+    }
     output.push({
       productId,
+      product,
       score: clampScore(record.score),
-      reason: typeof record.reason === 'string' ? record.reason : ''
+      reason: cleanText(record.reason, 300)
     })
-    if (output.length === 3) {
-      break
-    }
+    if (output.length === 3) break
   }
   return output
 }
