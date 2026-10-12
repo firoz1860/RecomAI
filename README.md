@@ -90,3 +90,53 @@ No server environment secret is required for the OpenAI key because the key is s
 
 - `docs/architecture.md` system architecture and data flow
 - `docs/development-plan.md` build plan and status
+
+## AI providers
+
+RecomAI works with several providers. Pick one in the API key modal and paste that provider's key. Groq, Google Gemini and OpenRouter offer free tiers, so you can use the app without adding billing.
+
+| Provider | Default model | Free tier | Get a key |
+| --- | --- | --- | --- |
+| OpenAI | gpt-4o-mini | no | https://platform.openai.com/api-keys |
+| Groq | llama-3.3-70b-versatile | yes | https://console.groq.com/keys |
+| Google Gemini | gemini-1.5-flash | yes | https://aistudio.google.com/apikey |
+| OpenRouter | openai/gpt-4o-mini | yes | https://openrouter.ai/keys |
+| Anthropic Claude | claude-3-5-haiku-20241022 | no | https://console.anthropic.com/settings/keys |
+| xAI Grok | grok-2-latest | no | https://console.x.ai |
+| Mistral | mistral-small-latest | no | https://console.mistral.ai/api-keys |
+
+The key you enter is sent only in the request header and is never stored on the server. It stays in memory, or in sessionStorage when you choose remember for this tab. The provider choice is stored in localStorage as a preference, and your saved search results are cached in localStorage. The key itself is never written to localStorage.
+
+## Environment variables
+
+No environment variable is required to run or deploy RecomAI, because the AI key is supplied by the visitor per request. The only optional variables override the default model for each provider:
+
+```
+RECOMAI_OPENAI_MODEL=gpt-4o-mini
+RECOMAI_GROQ_MODEL=llama-3.3-70b-versatile
+RECOMAI_GOOGLE_MODEL=gemini-1.5-flash
+RECOMAI_OPENROUTER_MODEL=openai/gpt-4o-mini
+RECOMAI_ANTHROPIC_MODEL=claude-3-5-haiku-20241022
+RECOMAI_XAI_MODEL=grok-2-latest
+RECOMAI_MISTRAL_MODEL=mistral-small-latest
+```
+
+## Free deployment on Vercel
+
+The Vercel Hobby plan is free and runs both the static site and the serverless route.
+
+Using the Vercel CLI:
+
+```
+npm install -g vercel
+vercel login
+vercel
+```
+
+Accept the detected settings (framework Vite, build command npm run build, output dist). The first run creates a preview URL. To publish to the production URL:
+
+```
+vercel --prod
+```
+
+No environment variable needs to be set for a working deployment. Add any RECOMAI_*_MODEL variable in the Vercel project settings only if you want to change a default model.
