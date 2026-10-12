@@ -223,6 +223,7 @@ export function Home() {
         onSave={handleSaveKey}
         onClear={clearKey}
         hasKey={hasKey}
+        apiKey={apiKey}
         remember={remember}
         providerId={providerId}
         model={modelId}
