@@ -4,6 +4,8 @@ export type ErrorCode =
   | 'empty_preference'
   | 'missing_key'
   | 'invalid_key'
+  | 'permission'
+  | 'model'
   | 'rate_limit'
   | 'quota'
   | 'network'
@@ -64,8 +66,12 @@ function clampScore(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(num)))
 }
 
-function errorResult(status: number, code: ErrorCode, error: string): CoreResult {
-  return { status, body: { code, error } }
+function errorResult(status: number, code: ErrorCode, error: string, retryAfter?: number): CoreResult {
+  const body: Record<string, unknown> = { code, error }
+  if (typeof retryAfter === 'number') {
+    body.retryAfter = retryAfter
+  }
+  return { status, body }
 }
 
 export async function generateRecommendations({ method, apiKey, body }: CoreInput): Promise<CoreResult> {
@@ -178,20 +184,85 @@ function normalize(
   return output
 }
 
-function mapOpenAiError(error: unknown): CoreResult {
-  const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : 0
-  const code = (error as { code?: unknown })?.code
-  if (status === 401) {
-    return errorResult(401, 'invalid_key', 'The provided OpenAI API key was rejected.')
+function readField(error: unknown, field: string): string {
+  const source = error as Record<string, unknown> | null
+  if (!source) {
+    return ''
   }
-  if (status === 429) {
-    if (code === 'insufficient_quota') {
-      return errorResult(402, 'quota', 'The OpenAI key has no available quota.')
+  const direct = source[field]
+  if (typeof direct === 'string') {
+    return direct.toLowerCase()
+  }
+  const nested = source.error
+  if (nested && typeof nested === 'object') {
+    const value = (nested as Record<string, unknown>)[field]
+    if (typeof value === 'string') {
+      return value.toLowerCase()
     }
-    return errorResult(429, 'rate_limit', 'The request was rate limited. Please retry shortly.')
   }
+  return ''
+}
+
+function parseRetryAfter(error: unknown): number | undefined {
+  const source = error as { headers?: unknown } | null
+  const headers = source?.headers
+  if (!headers) {
+    return undefined
+  }
+  let raw: string | null = null
+  if (typeof (headers as { get?: unknown }).get === 'function') {
+    raw = (headers as { get: (name: string) => string | null }).get('retry-after')
+  } else if (typeof headers === 'object') {
+    const value = (headers as Record<string, unknown>)['retry-after']
+    raw = typeof value === 'string' ? value : null
+  }
+  if (!raw) {
+    return undefined
+  }
+  const seconds = Number(raw)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.ceil(seconds)
+  }
+  const dateMs = Date.parse(raw)
+  if (!Number.isNaN(dateMs)) {
+    const diff = Math.ceil((dateMs - Date.now()) / 1000)
+    return diff > 0 ? diff : 0
+  }
+  return undefined
+}
+
+function mapOpenAiError(error: unknown): CoreResult {
+  const status =
+    typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : 0
+  const signals = readField(error, 'code') + ' ' + readField(error, 'type') + ' ' + readField(error, 'message')
+
+  if (signals.includes('insufficient_quota') || signals.includes('quota') || signals.includes('billing')) {
+    return errorResult(
+      402,
+      'quota',
+      'Your OpenAI account has no available quota. Add credits or billing in the OpenAI dashboard and try again.'
+    )
+  }
+
+  if (status === 401 || signals.includes('invalid_api_key') || signals.includes('invalid api key')) {
+    return errorResult(401, 'invalid_key', 'Your OpenAI API key was rejected. It may be incorrect, expired, or revoked.')
+  }
+
+  if (status === 403 || signals.includes('permission') || signals.includes('does not have access')) {
+    return errorResult(403, 'permission', 'This API key does not have access to the required model.')
+  }
+
+  if (status === 404 || signals.includes('model_not_found') || signals.includes('does not exist')) {
+    return errorResult(404, 'model', 'The configured model is not available for this key.')
+  }
+
+  if (status === 429) {
+    return errorResult(429, 'rate_limit', 'You are sending requests too quickly.', parseRetryAfter(error))
+  }
+
   if (status >= 500 || status === 0) {
     return errorResult(502, 'network', 'The recommendation service is temporarily unavailable.')
   }
+
   return errorResult(500, 'server', 'The recommendation request could not be completed.')
 }

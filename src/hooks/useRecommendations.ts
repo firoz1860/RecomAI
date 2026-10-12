@@ -1,11 +1,17 @@
 import { useCallback, useState } from 'react'
 import { requestRecommendations, RecommendationRequestError } from '../lib/api'
 import { clampScore } from '../lib/utils'
+import { clearStoredHistory, loadHistory, normalizePreference, persistHistory } from '../lib/history'
 import type {
+  HistoryEntry,
   Product,
   RecommendationErrorCode,
-  ResolvedRecommendation
+  ResolvedRecommendation,
+  StoredRecommendation
 } from '../lib/types'
+
+const cacheTtl = 1000 * 60 * 60 * 24
+const maxHistory = 8
 
 type Status = 'idle' | 'loading' | 'success' | 'error'
 
@@ -15,7 +21,9 @@ interface RecommendationState {
   results: ResolvedRecommendation[]
   errorCode: RecommendationErrorCode | null
   errorMessage: string
+  retryAfter: number | null
   lastPreference: string
+  fromCache: boolean
 }
 
 const initialState: RecommendationState = {
@@ -24,28 +32,79 @@ const initialState: RecommendationState = {
   results: [],
   errorCode: null,
   errorMessage: '',
-  lastPreference: ''
+  retryAfter: null,
+  lastPreference: '',
+  fromCache: false
+}
+
+export interface RecentSearch {
+  preference: string
+  timestamp: number
 }
 
 interface UseRecommendationsResult extends RecommendationState {
+  recent: RecentSearch[]
+  isCached: (preference: string) => boolean
   run: (preference: string, apiKey: string) => Promise<void>
   reset: () => void
+  clearHistory: () => void
 }
 
 export function useRecommendations(catalog: Product[]): UseRecommendationsResult {
   const [state, setState] = useState<RecommendationState>(initialState)
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
+
+  const findFreshEntry = useCallback(
+    (preference: string): HistoryEntry | undefined => {
+      const normalized = normalizePreference(preference)
+      return history.find(
+        (entry) => normalizePreference(entry.preference) === normalized && Date.now() - entry.timestamp < cacheTtl
+      )
+    },
+    [history]
+  )
+
+  const isCached = useCallback(
+    (preference: string): boolean => {
+      const entry = findFreshEntry(preference)
+      return entry ? resolveRecommendations(entry.items, catalog).length > 0 : false
+    },
+    [findFreshEntry, catalog]
+  )
 
   const run = useCallback(
     async (preference: string, apiKey: string) => {
       const trimmed = preference.trim()
-      setState((prev) => ({ ...prev, status: 'loading', lastPreference: trimmed }))
+      const normalized = normalizePreference(trimmed)
+      setState((prev) => ({
+        ...prev,
+        status: 'loading',
+        lastPreference: trimmed,
+        errorCode: null,
+        errorMessage: '',
+        retryAfter: null
+      }))
+
+      const cached = findFreshEntry(trimmed)
+      if (cached) {
+        const resolvedFromCache = resolveRecommendations(cached.items, catalog)
+        if (resolvedFromCache.length > 0) {
+          setState({
+            status: 'success',
+            summary: cached.summary,
+            results: resolvedFromCache,
+            errorCode: null,
+            errorMessage: '',
+            retryAfter: null,
+            lastPreference: trimmed,
+            fromCache: true
+          })
+          return
+        }
+      }
 
       try {
-        const response = await requestRecommendations(
-          { preference: trimmed, products: catalog },
-          apiKey
-        )
-
+        const response = await requestRecommendations({ preference: trimmed, products: catalog }, apiKey)
         const resolved = resolveRecommendations(response.recommendations, catalog)
 
         if (resolved.length === 0) {
@@ -55,10 +114,32 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
             results: [],
             errorCode: 'no_matches',
             errorMessage: 'No products in our catalog matched that request.',
-            lastPreference: trimmed
+            retryAfter: null,
+            lastPreference: trimmed,
+            fromCache: false
           })
           return
         }
+
+        const items: StoredRecommendation[] = resolved.map((item) => ({
+          productId: item.product.id,
+          score: item.score,
+          reason: item.reason
+        }))
+        const entry: HistoryEntry = {
+          preference: trimmed,
+          summary: response.summary,
+          items,
+          timestamp: Date.now()
+        }
+        setHistory((prev) => {
+          const next = [entry, ...prev.filter((h) => normalizePreference(h.preference) !== normalized)].slice(
+            0,
+            maxHistory
+          )
+          persistHistory(next)
+          return next
+        })
 
         setState({
           status: 'success',
@@ -66,7 +147,9 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
           results: resolved,
           errorCode: null,
           errorMessage: '',
-          lastPreference: trimmed
+          retryAfter: null,
+          lastPreference: trimmed,
+          fromCache: false
         })
       } catch (error) {
         const code: RecommendationErrorCode =
@@ -75,22 +158,40 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
           error instanceof RecommendationRequestError
             ? error.message
             : 'Something went wrong while generating recommendations.'
+        const retryAfter =
+          error instanceof RecommendationRequestError && typeof error.retryAfter === 'number'
+            ? error.retryAfter
+            : null
         setState({
           status: 'error',
           summary: '',
           results: [],
           errorCode: code,
           errorMessage: message,
-          lastPreference: trimmed
+          retryAfter,
+          lastPreference: trimmed,
+          fromCache: false
         })
       }
     },
-    [catalog]
+    [catalog, findFreshEntry]
   )
 
-  const reset = useCallback(() => setState(initialState), [])
+  const reset = useCallback(() => {
+    setState((prev) => ({ ...initialState, lastPreference: prev.lastPreference }))
+  }, [])
 
-  return { ...state, run, reset }
+  const clearHistory = useCallback(() => {
+    setHistory([])
+    clearStoredHistory()
+  }, [])
+
+  const recent: RecentSearch[] = history.map((entry) => ({
+    preference: entry.preference,
+    timestamp: entry.timestamp
+  }))
+
+  return { ...state, recent, isCached, run, reset, clearHistory }
 }
 
 function resolveRecommendations(

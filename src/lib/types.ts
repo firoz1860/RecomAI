@@ -51,6 +51,8 @@ export type RecommendationErrorCode =
   | 'empty_preference'
   | 'missing_key'
   | 'invalid_key'
+  | 'permission'
+  | 'model'
   | 'rate_limit'
   | 'quota'
   | 'network'
@@ -62,6 +64,7 @@ export type RecommendationErrorCode =
 export interface RecommendationErrorBody {
   error: string
   code: RecommendationErrorCode
+  retryAfter?: number
 }
 
 export type CategoryFilter = Category | 'all'
@@ -72,3 +75,16 @@ export type SortKey =
   | 'priceHighLow'
   | 'ratingHighLow'
   | 'nameAsc'
+
+export interface StoredRecommendation {
+  productId: string
+  score: number
+  reason: string
+}
+
+export interface HistoryEntry {
+  preference: string
+  summary: string
+  items: StoredRecommendation[]
+  timestamp: number
+}

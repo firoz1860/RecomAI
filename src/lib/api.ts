@@ -6,29 +6,37 @@ import type {
 
 export class RecommendationRequestError extends Error {
   code: RecommendationErrorCode
+  retryAfter?: number
 
-  constructor(code: RecommendationErrorCode, message: string) {
+  constructor(code: RecommendationErrorCode, message: string, retryAfter?: number) {
     super(message)
     this.name = 'RecommendationRequestError'
     this.code = code
+    this.retryAfter = retryAfter
   }
 }
 
-const messages: Record<RecommendationErrorCode, string> = {
+const baseMessages: Record<RecommendationErrorCode, string> = {
   empty_preference: 'Please describe what you are looking for first.',
   missing_key: 'Add your OpenAI API key to get recommendations.',
-  invalid_key: 'That OpenAI API key was rejected. Please check it and try again.',
-  rate_limit: 'Too many requests right now. Please wait a moment and retry.',
-  quota: 'This key has no available quota. Check your OpenAI billing and try again.',
-  network: 'We could not reach the recommendation service. Check your connection.',
+  invalid_key: 'Your OpenAI API key was rejected. It may be incorrect, expired, or revoked. Please reconnect a valid key.',
+  permission: 'This API key does not have access to the required model. Check your OpenAI project permissions.',
+  model: 'The configured model is not available for this key. Try a different model or key.',
+  rate_limit: 'You are sending requests too quickly. Please wait a moment and retry.',
+  quota: 'Your OpenAI account has no available quota. Add credits or billing in the OpenAI dashboard and try again.',
+  network: 'We could not reach the recommendation service. Check your connection and retry.',
   invalid_response: 'The AI returned an unexpected response. Please try again.',
   no_matches: 'No products in our catalog matched that request.',
   bad_request: 'The request was invalid. Please try again.',
   server: 'Something went wrong while generating recommendations.'
 }
 
-export function messageForCode(code: RecommendationErrorCode): string {
-  return messages[code]
+export function messageForCode(code: RecommendationErrorCode, retryAfter?: number): string {
+  if (code === 'rate_limit' && typeof retryAfter === 'number' && retryAfter > 0) {
+    const unit = retryAfter === 1 ? 'second' : 'seconds'
+    return `You are sending requests too quickly. Please wait ${retryAfter} ${unit} and retry.`
+  }
+  return baseMessages[code]
 }
 
 interface RecommendPayload {
@@ -52,7 +60,7 @@ export async function requestRecommendations(
       body: JSON.stringify(payload)
     })
   } catch {
-    throw new RecommendationRequestError('network', messages.network)
+    throw new RecommendationRequestError('network', baseMessages.network)
   }
 
   let data: unknown = null
@@ -60,18 +68,19 @@ export async function requestRecommendations(
     data = await response.json()
   } catch {
     if (!response.ok) {
-      throw new RecommendationRequestError('server', messages.server)
+      throw new RecommendationRequestError('server', baseMessages.server)
     }
-    throw new RecommendationRequestError('invalid_response', messages.invalid_response)
+    throw new RecommendationRequestError('invalid_response', baseMessages.invalid_response)
   }
 
   if (!response.ok) {
     const code = resolveErrorCode(data)
-    throw new RecommendationRequestError(code, messageForCode(code))
+    const retryAfter = resolveRetryAfter(data)
+    throw new RecommendationRequestError(code, messageForCode(code, retryAfter), retryAfter)
   }
 
   if (!isRecommendationResponse(data)) {
-    throw new RecommendationRequestError('invalid_response', messages.invalid_response)
+    throw new RecommendationRequestError('invalid_response', baseMessages.invalid_response)
   }
 
   return data
@@ -83,11 +92,23 @@ function resolveErrorCode(data: unknown): RecommendationErrorCode {
     typeof data === 'object' &&
     'code' in data &&
     typeof (data as { code: unknown }).code === 'string' &&
-    (data as { code: string }).code in messages
+    (data as { code: string }).code in baseMessages
   ) {
     return (data as { code: RecommendationErrorCode }).code
   }
   return 'server'
+}
+
+function resolveRetryAfter(data: unknown): number | undefined {
+  if (
+    data &&
+    typeof data === 'object' &&
+    'retryAfter' in data &&
+    typeof (data as { retryAfter: unknown }).retryAfter === 'number'
+  ) {
+    return (data as { retryAfter: number }).retryAfter
+  }
+  return undefined
 }
 
 function isRecommendationResponse(data: unknown): data is RecommendationResponse {
@@ -95,7 +116,5 @@ function isRecommendationResponse(data: unknown): data is RecommendationResponse
     return false
   }
   const value = data as { summary?: unknown; recommendations?: unknown }
-  return (
-    typeof value.summary === 'string' && Array.isArray(value.recommendations)
-  )
+  return typeof value.summary === 'string' && Array.isArray(value.recommendations)
 }

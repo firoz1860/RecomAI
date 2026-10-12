@@ -6,6 +6,7 @@ import { ProductGrid } from '../components/ProductGrid'
 import { ProductDetailModal } from '../components/ProductDetailModal'
 import { ApiKeyModal } from '../components/ApiKeyModal'
 import { RecommendationResults } from '../components/RecommendationResults'
+import { RecentSearches } from '../components/RecentSearches'
 import { LoadingRecommendations } from '../components/LoadingRecommendations'
 import { EmptyState } from '../components/EmptyState'
 import { useApiKey } from '../hooks/useApiKey'
@@ -15,9 +16,12 @@ import { matchesCategory, matchesSearch, sortProducts } from '../lib/utils'
 import type {
   CategoryFilter as CategoryFilterValue,
   Product,
+  RecommendationErrorCode,
   ResolvedRecommendation,
   SortKey
 } from '../lib/types'
+
+const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission', 'model', 'quota']
 
 export function Home() {
   const { apiKey, hasKey, remember, saveKey, clearKey } = useApiKey()
@@ -30,7 +34,7 @@ export function Home() {
   const [sort, setSort] = useState<SortKey>('featured')
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [keyModalOpen, setKeyModalOpen] = useState(false)
-  const [pendingRun, setPendingRun] = useState(false)
+  const [pendingPreference, setPendingPreference] = useState<string | null>(null)
 
   const counts = useMemo(() => {
     return products.reduce<Record<string, number>>((acc, product) => {
@@ -53,29 +57,53 @@ export function Home() {
       return
     }
     setPreferenceError('')
+    if (recommendations.isCached(trimmed)) {
+      void recommendations.run(trimmed, apiKey)
+      return
+    }
     if (!hasKey) {
-      setPendingRun(true)
+      setPendingPreference(trimmed)
       setKeyModalOpen(true)
       return
     }
     void recommendations.run(trimmed, apiKey)
   }
 
+  function handleSelectRecent(value: string) {
+    setPreference(value)
+    startRequest(value)
+  }
+
   function handleSaveKey(key: string, rememberForTab: boolean) {
     saveKey(key, rememberForTab)
-    if (pendingRun) {
-      setPendingRun(false)
-      void recommendations.run(preference.trim(), key)
+    if (pendingPreference) {
+      const next = pendingPreference
+      setPendingPreference(null)
+      void recommendations.run(next, key)
     }
   }
 
   function handleManageKey() {
-    setPendingRun(false)
+    setPendingPreference(null)
     setKeyModalOpen(true)
   }
 
-  const showConnectAction =
-    recommendations.errorCode === 'missing_key' || recommendations.errorCode === 'invalid_key'
+  const code = recommendations.errorCode
+  const needsKey = code !== null && keyErrorCodes.includes(code)
+  const errorActionLabel = needsKey
+    ? code === 'missing_key'
+      ? 'Connect API key'
+      : code === 'quota'
+        ? 'Use a different key'
+        : 'Update API key'
+    : code === 'no_matches'
+      ? undefined
+      : 'Try again'
+  const errorAction = needsKey
+    ? handleManageKey
+    : code === 'no_matches'
+      ? undefined
+      : () => startRequest(recommendations.lastPreference)
 
   return (
     <div className="min-h-screen">
@@ -94,12 +122,18 @@ export function Home() {
         hasKey={hasKey}
       />
 
-      <main className="mx-auto max-w-7xl space-y-10 px-4 pb-20 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-4 pb-20 sm:px-6 lg:px-8">
         {preferenceError && (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="alert">
             {preferenceError}
           </p>
         )}
+
+        <RecentSearches
+          items={recommendations.recent}
+          onSelect={handleSelectRecent}
+          onClear={recommendations.clearHistory}
+        />
 
         {recommendations.status === 'loading' && <LoadingRecommendations />}
 
@@ -108,9 +142,8 @@ export function Home() {
             summary={recommendations.summary}
             preference={recommendations.lastPreference}
             results={recommendations.results}
-            onSelect={(recommendation: ResolvedRecommendation) =>
-              setSelectedProduct(recommendation.product)
-            }
+            fromCache={recommendations.fromCache}
+            onSelect={(recommendation: ResolvedRecommendation) => setSelectedProduct(recommendation.product)}
             onDismiss={recommendations.reset}
           />
         )}
@@ -120,14 +153,13 @@ export function Home() {
             variant="error"
             title="We could not finish that"
             message={recommendations.errorMessage}
-            actionLabel={showConnectAction ? 'Connect API key' : 'Try again'}
-            onAction={
-              showConnectAction ? handleManageKey : () => startRequest(recommendations.lastPreference)
-            }
+            actionLabel={errorActionLabel}
+            onAction={errorAction}
+            retryAfter={code === 'rate_limit' ? recommendations.retryAfter ?? undefined : undefined}
           />
         )}
 
-        <section className="space-y-6">
+        <section className="space-y-6 pt-2">
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">Explore products</h2>
             <p className="text-sm text-slate-500">
@@ -173,7 +205,7 @@ export function Home() {
         open={keyModalOpen}
         onClose={() => {
           setKeyModalOpen(false)
-          setPendingRun(false)
+          setPendingPreference(null)
         }}
         onSave={handleSaveKey}
         onClear={clearKey}

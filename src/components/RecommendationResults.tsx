@@ -6,6 +6,7 @@ interface RecommendationResultsProps {
   summary: string
   preference: string
   results: ResolvedRecommendation[]
+  fromCache: boolean
   onSelect: (recommendation: ResolvedRecommendation) => void
   onDismiss: () => void
 }
@@ -14,6 +15,7 @@ export function RecommendationResults({
   summary,
   preference,
   results,
+  fromCache,
   onSelect,
   onDismiss
 }: RecommendationResultsProps) {
@@ -25,7 +27,14 @@ export function RecommendationResults({
             <SparklesIcon className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">Your matches</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold tracking-tight text-slate-900">Your matches</h2>
+              {fromCache && (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  Saved result
+                </span>
+              )}
+            </div>
             {preference && (
               <p className="text-sm text-slate-500">
                 Based on: <span className="font-medium text-slate-700">{preference}</span>
