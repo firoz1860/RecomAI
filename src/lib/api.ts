@@ -40,6 +40,7 @@ interface RecommendPayload {
   preference: string
   products: Product[]
   provider: ProviderId
+  model: string
 }
 
 export async function requestRecommendations(
