@@ -133,12 +133,25 @@ export async function generateRecommendations({ method, apiKey, provider, body }
   }
 
   const validIds = new Set(catalog.map((item) => item.id))
-  const model = process.env[selected.envModelVar] || selected.defaultModel
+  const model = selected.id === 'google' ? selected.defaultModel : process.env[selected.envModelVar] || selected.defaultModel
 
   try {
-    const client = new OpenAI({ apiKey: key, baseURL: selected.baseUrl })
-    const completion = await client.chat.completions.create({
-      model,
+    const client = new OpenAI({ apiKey: key, baseURL: selected.baseUrl, maxRetries: 0, timeout: 25_000 })
+    const candidateModels =
+      selected.id === 'google'
+        ? [model, 'gemini-3.8-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'].filter(
+            (candidate, index, all) => all.indexOf(candidate) === index
+          )
+        : [model]
+    let completion
+    let lastModelError: unknown
+
+    for (const candidateModel of candidateModels) {
+      try {
+        completion = await client.chat.completions.create({
+          model: candidateModel,
+          max_tokens: 700,
+          ...(selected.id === 'google' ? { reasoning_effort: 'low' as const } : {}),
       temperature: 0.2,
       ...(selected.supportsJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
       messages: [
@@ -155,8 +168,20 @@ export async function generateRecommendations({ method, apiKey, provider, body }
           role: 'user',
           content: JSON.stringify({ preference, catalog })
         }
-      ]
-    })
+        ]
+        })
+        break
+      } catch (modelError) {
+        lastModelError = modelError
+        if (selected.id !== 'google' || !isUnavailableModelError(modelError)) {
+          throw modelError
+        }
+      }
+    }
+
+    if (!completion) {
+      throw lastModelError ?? new Error('No compatible Gemini model is available for this API key.')
+    }
 
     const content = completion.choices[0]?.message?.content
     if (!content) {
@@ -260,6 +285,21 @@ function parseRetryAfter(error: unknown): number | undefined {
     return diff > 0 ? diff : 0
   }
   return undefined
+}
+
+function isUnavailableModelError(error: unknown): boolean {
+  const status =
+    typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : 0
+  const signals = readField(error, 'code') + ' ' + readField(error, 'type') + ' ' + readField(error, 'message')
+  return (
+    status === 404 ||
+    (signals.includes('model') &&
+      (signals.includes('not available') ||
+        signals.includes('not found') ||
+        signals.includes('does not exist') ||
+        signals.includes('not supported') ||
+        signals.includes('unknown model')))
+  )
 }
 
 function mapProviderError(error: unknown): CoreResult {
