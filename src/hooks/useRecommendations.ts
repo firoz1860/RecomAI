@@ -45,7 +45,7 @@ export interface RecentSearch {
 
 interface UseRecommendationsResult extends RecommendationState {
   recent: RecentSearch[]
-  isCached: (preference: string) => boolean
+  isCached: (preference: string, provider: ProviderId, model: string) => boolean
   run: (preference: string, apiKey: string, provider: ProviderId, model: string) => Promise<void>
   reset: () => void
   clearHistory: () => void
@@ -56,18 +56,22 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory())
 
   const findFreshEntry = useCallback(
-    (preference: string): HistoryEntry | undefined => {
+    (preference: string, provider: ProviderId, model: string): HistoryEntry | undefined => {
       const normalized = normalizePreference(preference)
       return history.find(
-        (entry) => normalizePreference(entry.preference) === normalized && Date.now() - entry.timestamp < cacheTtl
+        (entry) =>
+          normalizePreference(entry.preference) === normalized &&
+          entry.provider === provider &&
+          entry.model === model &&
+          Date.now() - entry.timestamp < cacheTtl
       )
     },
     [history]
   )
 
   const isCached = useCallback(
-    (preference: string): boolean => {
-      const entry = findFreshEntry(preference)
+    (preference: string, provider: ProviderId, model: string): boolean => {
+      const entry = findFreshEntry(preference, provider, model)
       return entry ? resolveRecommendations(entry.items, catalog).length > 0 : false
     },
     [findFreshEntry, catalog]
@@ -86,7 +90,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
         retryAfter: null
       }))
 
-      const cached = findFreshEntry(trimmed)
+      const cached = findFreshEntry(trimmed, provider, model)
       if (cached) {
         const resolvedFromCache = resolveRecommendations(cached.items, catalog)
         if (resolvedFromCache.length > 0) {
@@ -124,11 +128,14 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
 
         const items: StoredRecommendation[] = resolved.map((item) => ({
           productId: item.product.id,
+          product: item.product,
           score: item.score,
           reason: item.reason
         }))
         const entry: HistoryEntry = {
           preference: trimmed,
+          provider,
+          model,
           summary: response.summary,
           items,
           timestamp: Date.now()
@@ -196,7 +203,7 @@ export function useRecommendations(catalog: Product[]): UseRecommendationsResult
 }
 
 function resolveRecommendations(
-  raw: Array<{ productId: string; score: number; reason: string }>,
+  raw: Array<{ productId?: string; product?: Product; score: number; reason: string }>,
   catalog: Product[]
 ): ResolvedRecommendation[] {
   const byId = new Map(catalog.map((product) => [product.id, product]))
@@ -207,7 +214,7 @@ function resolveRecommendations(
     if (!item || typeof item.productId !== 'string') {
       continue
     }
-    const product = byId.get(item.productId)
+    const product = item.product ?? (item.productId ? byId.get(item.productId) : undefined)
     if (!product || seen.has(product.id)) {
       continue
     }
