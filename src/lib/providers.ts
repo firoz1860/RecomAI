@@ -43,7 +43,7 @@ export const providers: ProviderInfo[] = [
     keyPlaceholder: 'gsk_...',
     keysUrl: 'https://console.groq.com/keys',
     billingUrl: 'https://console.groq.com/settings/billing',
-    freeTier: false
+    freeTier: true
   },
   {
     id: 'google',
@@ -73,7 +73,7 @@ export const providers: ProviderInfo[] = [
     id: 'anthropic',
     label: 'Anthropic Claude',
     baseUrl: 'https://api.anthropic.com/v1',
-    defaultModel: 'claude-3-5-haiku-20241022',
+    defaultModel: 'claude-haiku-5-5',
     envModelVar: 'RECOMAI_ANTHROPIC_MODEL',
     supportsJsonMode: false,
     keyPlaceholder: 'sk-ant-...',
