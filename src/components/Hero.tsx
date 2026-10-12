@@ -25,7 +25,7 @@ export function Hero({ preference, onPreferenceChange, onSubmit, loading, hasKey
           Find your perfect product
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-slate-600">
-          Tell our AI what you need. We will match you with the best products from our catalog.
+          Describe what matters to you. AI will suggest products tailored to your needs, budget, and priorities.
         </p>
         <div className="mx-auto mt-8 max-w-2xl text-left">
           <PreferenceInput

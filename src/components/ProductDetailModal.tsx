@@ -34,9 +34,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 {product.brand} / {categoryLabel(product.category)}
               </p>
-              <StarRating rating={product.rating} reviewCount={product.reviewCount} className="mt-1" />
+              {product.rating > 0 && <StarRating rating={product.rating} reviewCount={product.reviewCount} className="mt-1" />}
             </div>
-            <span className="text-2xl font-bold text-slate-900">{formatPrice(product.price)}</span>
+            <span className="text-right">
+              <span className="block text-2xl font-bold text-slate-900">{product.price > 0 ? formatPrice(product.price) : 'Price varies'}</span>
+              {product.priceIsEstimate && <span className="block text-xs font-medium text-slate-400">AI estimate; verify with retailer</span>}
+            </span>
           </div>
           <p className="text-sm leading-relaxed text-slate-600">{product.description}</p>
           <div>
@@ -52,6 +55,11 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               ))}
             </ul>
           </div>
+          {product.sourceUrl?.startsWith('https://www.google.com/search?') && (
+            <a href={product.sourceUrl} target="_blank" rel="noreferrer noopener" className="inline-flex items-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus-ring">
+              Check current listings
+            </a>
+          )}
           <div className="flex flex-wrap gap-2">
             {product.tags.map((tag) => (
               <span key={tag} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">

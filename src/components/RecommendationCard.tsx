@@ -36,12 +36,15 @@ export function RecommendationCard({ recommendation, rank, onSelect }: Recommend
           <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
             {categoryLabel(product.category)}
           </span>
-          <StarRating rating={product.rating} />
+          {product.rating > 0 ? <StarRating rating={product.rating} /> : <span className="text-xs text-slate-400">AI suggestion</span>}
         </div>
         <h3 className="text-base font-semibold leading-snug text-slate-900">{product.name}</h3>
         <p className="rounded-xl bg-brand-50/70 px-3 py-2 text-sm text-slate-600">{reason}</p>
         <div className="mt-auto flex items-center justify-between pt-1">
-          <span className="text-lg font-bold text-slate-900">{formatPrice(product.price)}</span>
+          <span className="text-right">
+            <span className="block text-lg font-bold text-slate-900">{product.price > 0 ? formatPrice(product.price) : 'Price varies'}</span>
+            <span className="block text-[11px] font-medium text-slate-400">{product.price > 0 ? 'Estimated price' : 'Check current price'}</span>
+          </span>
           <span className="text-sm font-medium text-brand-600">View details</span>
         </div>
       </div>

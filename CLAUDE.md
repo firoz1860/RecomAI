@@ -1,12 +1,12 @@
 # RecomAI project guide
 
-RecomAI is a Vite plus React plus TypeScript single page app with one Vercel serverless function. It recommends products from a fixed local catalog using a visitor supplied OpenAI key.
+RecomAI is a Vite plus React plus TypeScript single page app with one Vercel serverless function. It generates product suggestions from natural-language requests using a visitor-supplied provider key. The local catalog is browseable and sent as optional context, but generated recommendations are not restricted to it.
 
 ## Architecture
 
 - Frontend state lives in React hooks. No global store.
-- The catalog in src/data/products.ts is the single source of truth.
-- The AI may return only ids present in the catalog. Unknown ids are dropped on the server and again on the client.
+- src/data/products.ts is the static browse catalog; AI recommendations return normalized product snapshots and may include products outside that catalog.
+- Treat generated prices and specifications as estimates, never ratings or live inventory. The server creates a shopping search URL instead of trusting a URL from a model.
 - The serverless route api/recommend.ts is stateless and never stores the key.
 - Endpoint logic is shared in api/recommend-core.ts. The Vercel function and a Vite middleware both call it, so npm run dev and npm run preview serve the real recommendation flow locally.
 

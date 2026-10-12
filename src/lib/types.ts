@@ -28,10 +28,13 @@ export interface Product {
   features: string[]
   tags: string[]
   featured: boolean
+  priceIsEstimate?: boolean
+  sourceUrl?: string
 }
 
 export interface Recommendation {
   productId: string
+  product?: Product
   score: number
   reason: string
 }
@@ -78,12 +81,15 @@ export type SortKey =
 
 export interface StoredRecommendation {
   productId: string
+  product?: Product
   score: number
   reason: string
 }
 
 export interface HistoryEntry {
   preference: string
+  provider?: string
+  model?: string
   summary: string
   items: StoredRecommendation[]
   timestamp: number

@@ -59,7 +59,7 @@ export function Home() {
       return
     }
     setPreferenceError('')
-    if (recommendations.isCached(trimmed)) {
+    if (recommendations.isCached(trimmed, providerId, modelId)) {
       void recommendations.run(trimmed, apiKey, providerId, modelId)
       return
     }
@@ -176,7 +176,7 @@ export function Home() {
           <div className="flex flex-col gap-1">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">Explore products</h2>
             <p className="text-sm text-slate-500">
-              Browse the full catalog or let the AI narrow it down for you.
+              Browse our sample catalog, or describe what you need to get AI-generated product suggestions.
             </p>
           </div>
 
@@ -210,7 +210,7 @@ export function Home() {
       <footer className="border-t border-slate-200/70 bg-white/60">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-6 text-center text-sm text-slate-400 sm:flex-row sm:text-left sm:px-6 lg:px-8">
           <span>RecomAI product recommendations</span>
-          <span>Recommendations are generated from a fixed local catalog.</span>
+          <span>AI suggestions are generated from your prompt. Check current prices and specifications with retailers.</span>
         </div>
       </footer>
 
