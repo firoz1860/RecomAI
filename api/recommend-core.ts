@@ -288,7 +288,19 @@ function mapProviderError(error: unknown): CoreResult {
     return errorResult(403, 'permission', 'This API key does not have access to the selected model.')
   }
 
-  if (status === 404 || signals.includes('model_not_found') || signals.includes('does not exist') || signals.includes('not found')) {
+  if (
+    status === 404 ||
+    signals.includes('model_not_found') ||
+    signals.includes('model_not_available') ||
+    signals.includes('invalid_model') ||
+    signals.includes('does not exist') ||
+    signals.includes('not found') ||
+    signals.includes('decommission') ||
+    signals.includes('retired') ||
+    signals.includes('deprecated') ||
+    signals.includes('no longer available') ||
+    signals.includes('no longer supported')
+  ) {
     return errorResult(404, 'model', 'The selected model is not available for this key.')
   }
 

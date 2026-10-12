@@ -23,7 +23,7 @@ import type {
   SortKey
 } from '../lib/types'
 
-const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission', 'model']
+const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission']
 
 export function Home() {
   const { apiKey, providerId, hasKey, remember, saveKey, clearKey } = useApiKey()
@@ -99,6 +99,9 @@ export function Home() {
   let errorActionHref: string | undefined
   if (needsKey) {
     errorActionLabel = code === 'missing_key' ? 'Connect API key' : 'Update API key'
+    errorAction = handleManageKey
+  } else if (code === 'model') {
+    errorActionLabel = 'Change provider'
     errorAction = handleManageKey
   } else if (code === 'quota') {
     errorActionLabel = `Add credits in ${currentProvider?.label ?? 'your provider'}`

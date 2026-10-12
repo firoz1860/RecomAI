@@ -36,7 +36,7 @@ export function Hero({ preference, onPreferenceChange, onSubmit, loading, hasKey
           />
           {!hasKey && (
             <p className="mt-3 text-center text-xs text-slate-400">
-              You will be asked for an OpenAI API key. It stays in your browser and is sent only with your request.
+              You will be asked for an AI provider API key. It stays in your browser and is sent only with your request.
             </p>
           )}
         </div>
