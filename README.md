@@ -1,8 +1,8 @@
 # RecomAI
 
-A polished React product recommendation app. It shows a fixed local product catalog and uses a visitor-supplied API key from a supported provider to recommend only products from that catalog based on natural language preferences such as "I want a phone under $500".
+A React product discovery app that turns natural-language requests into up to three AI-generated product suggestions. The included 22-item catalog remains available to browse and is optional context for the AI; recommendations are generated as complete product cards and are not restricted to those demo items.
 
-The catalog is the single source of truth. The AI may return only product ids that exist in the catalog, and the app discards anything it does not recognise before rendering.
+AI-generated prices and specifications are estimates. Each suggestion includes a shopping search link so users can check current listings before buying.
 
 ## Stack
 
