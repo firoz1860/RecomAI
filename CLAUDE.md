@@ -1,6 +1,6 @@
 # RecomAI project guide
 
-RecomAI is a Vite plus React plus TypeScript single page app with one Vercel serverless function. It recommends products from a fixed local catalog using a visitor supplied OpenAI key.
+RecomAI is a Vite plus React plus TypeScript single page app with one Vercel serverless function. It generates product suggestions from natural-language requests using a visitor-supplied provider key. The local catalog is browseable and sent as optional context, but generated recommendations are not restricted to it.
 
 ## Architecture
 
