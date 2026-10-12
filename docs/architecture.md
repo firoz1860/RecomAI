@@ -41,6 +41,15 @@ The app does not trust the model. Validation happens on both sides.
 - Server: confirms each returned id exists in the supplied catalog, removes duplicates, clamps scores to 0 to 100, and caps the list at three.
 - Client: repeats the id existence check against the local catalog, removes duplicates, clamps scores and caps the list. Product detail is rendered only from the local catalog, so a hallucinated product can never appear.
 
+## Serverless and local development
+
+The recommendation logic lives in one framework neutral module, `api/recommend-core.ts`, which exposes `generateRecommendations`. Two thin adapters call it:
+
+- `api/recommend.ts` adapts the Vercel request and response and runs in production.
+- A small Vite plugin in `vite.config.ts` adapts the Node request and response and serves the same route during `npm run dev` and `npm run preview`.
+
+This keeps local and production behaviour identical and lets the full flow run locally without extra tooling. The OpenAI SDK is imported only by the core, so it never enters the client bundle.
+
 ## Security
 
 - The OpenAI key is supplied by the visitor and used for a single request. It is never stored on the server.

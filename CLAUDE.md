@@ -8,6 +8,7 @@ RecomAI is a Vite plus React plus TypeScript single page app with one Vercel ser
 - The catalog in src/data/products.ts is the single source of truth.
 - The AI may return only ids present in the catalog. Unknown ids are dropped on the server and again on the client.
 - The serverless route api/recommend.ts is stateless and never stores the key.
+- Endpoint logic is shared in api/recommend-core.ts. The Vercel function and a Vite middleware both call it, so npm run dev and npm run preview serve the real recommendation flow locally.
 
 ## Conventions
 
@@ -27,4 +28,4 @@ RecomAI is a Vite plus React plus TypeScript single page app with one Vercel ser
 
 ## Verification before done
 
-Run typecheck, lint and build. Confirm no secret is present in the diff. Exercise the catalog, the key modal and the recommendation flow. For the full AI flow use vercel dev or a deployment with a real key.
+Run typecheck, lint and build. Confirm no secret is present in the diff. Exercise the catalog, the key modal and the recommendation flow. The full AI flow runs under npm run dev with a real key, and also on a Vercel deployment.

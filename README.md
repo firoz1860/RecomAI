@@ -31,12 +31,7 @@ npm run dev
 
 Open the local URL that Vite prints.
 
-The recommendation request calls the serverless route at `api/recommend.ts`. During a plain `vite dev` or `vite preview` session that route is not served, so the AI flow returns a friendly error. Run the full stack with the Vercel toolchain to exercise it locally:
-
-```
-npm install -g vercel
-vercel dev
-```
+The recommendation request calls the serverless route at `api/recommend.ts`. In local development the same endpoint logic lives in `api/recommend-core.ts` and is served by a Vite middleware plugin, so `npm run dev` and `npm run preview` both run the full recommendation flow against OpenAI with your supplied key. In production on Vercel the `api/recommend.ts` function runs the identical core. No extra tooling is required for local testing.
 
 ## Scripts
 

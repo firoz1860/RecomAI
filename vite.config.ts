@@ -1,8 +1,53 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { generateRecommendations } from './api/recommend-core'
+
+function recommendApiPlugin(): Plugin {
+  const middleware = async (req: IncomingMessage, res: ServerResponse) => {
+    const chunks: Buffer[] = []
+    for await (const chunk of req) {
+      chunks.push(chunk as Buffer)
+    }
+    const raw = Buffer.concat(chunks).toString('utf8')
+    let parsed: unknown = null
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        parsed = null
+      }
+    }
+    const headerValue = req.headers['x-openai-api-key']
+    const apiKey = (Array.isArray(headerValue) ? headerValue[0] : headerValue ?? '').toString().trim()
+
+    const result = await generateRecommendations({
+      method: req.method ?? 'GET',
+      apiKey,
+      body: parsed
+    })
+
+    if (result.allow) {
+      res.setHeader('Allow', result.allow)
+    }
+    res.statusCode = result.status
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify(result.body))
+  }
+
+  return {
+    name: 'recomai-recommend-api',
+    configureServer(server) {
+      server.middlewares.use('/api/recommend', middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use('/api/recommend', middleware)
+    }
+  }
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), recommendApiPlugin()],
   server: {
     port: 5173
   },
