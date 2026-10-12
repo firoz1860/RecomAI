@@ -133,12 +133,13 @@ export async function generateRecommendations({ method, apiKey, provider, body }
   }
 
   const validIds = new Set(catalog.map((item) => item.id))
-  const model = selected.id === 'google' ? selected.defaultModel : process.env[selected.envModelVar] || selected.defaultModel
+  const requestedModel = typeof payload.model === 'string' ? payload.model.trim().slice(0, 200) : ''
+  const model = requestedModel || (selected.id === 'google' ? selected.defaultModel : process.env[selected.envModelVar] || selected.defaultModel)
 
   try {
     const client = new OpenAI({ apiKey: key, baseURL: selected.baseUrl, maxRetries: 0, timeout: 25_000 })
     const candidateModels =
-      selected.id === 'google'
+      selected.id === 'google' && model === selected.defaultModel
         ? [model, 'gemini-3.8-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'].filter(
             (candidate, index, all) => all.indexOf(candidate) === index
           )
@@ -152,7 +153,7 @@ export async function generateRecommendations({ method, apiKey, provider, body }
           model: candidateModel,
           max_tokens: 700,
           ...(selected.id === 'google' ? { reasoning_effort: 'low' as const } : {}),
-      temperature: 0.2,
+      ...(selected.id === 'anthropic' ? {} : { temperature: 0.2 }),
       ...(selected.supportsJsonMode ? { response_format: { type: 'json_object' as const } } : {}),
       messages: [
         {
