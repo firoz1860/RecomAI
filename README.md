@@ -99,7 +99,7 @@ RecomAI works with several providers. Pick one in the API key modal and paste th
 | --- | --- | --- | --- |
 | OpenAI | gpt-4o-mini | no | https://platform.openai.com/api-keys |
 | Groq | openai/gpt-oss-120b | no | https://console.groq.com/keys |
-| Google Gemini | gemini-3.8-flash | yes | https://aistudio.google.com/apikey |
+| Google Gemini | gemini-3.5-flash-lite | yes | https://aistudio.google.com/apikey |
 | OpenRouter | x-ai/grok-4.1-fast:free | yes | https://openrouter.ai/keys |
 | Anthropic Claude | claude-3-5-haiku-20241022 | no | https://console.anthropic.com/settings/keys |
 | xAI Grok | grok-4.7 | no | https://console.x.ai |
@@ -114,7 +114,7 @@ No environment variable is required to run or deploy RecomAI, because the AI key
 ```
 RECOMAI_OPENAI_MODEL=gpt-4o-mini
 RECOMAI_GROQ_MODEL=openai/gpt-oss-120b
-RECOMAI_GOOGLE_MODEL=gemini-3.8-flash
+RECOMAI_GOOGLE_MODEL=gemini-3.5-flash-lite
 RECOMAI_OPENROUTER_MODEL=x-ai/grok-4.1-fast:free
 RECOMAI_ANTHROPIC_MODEL=claude-3-5-haiku-20241022
 RECOMAI_XAI_MODEL=grok-4.7
