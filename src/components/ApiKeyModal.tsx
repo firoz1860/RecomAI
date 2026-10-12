@@ -10,12 +10,13 @@ interface ApiKeyModalProps {
   onSave: (key: string, providerId: ProviderId, model: string, remember: boolean) => void
   onClear: () => void
   hasKey: boolean
+  apiKey: string
   remember: boolean
   providerId: ProviderId
   model: string
 }
 
-export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, providerId, model }: ApiKeyModalProps) {
+export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, apiKey, remember, providerId, model }: ApiKeyModalProps) {
   const [draftProvider, setDraftProvider] = useState<ProviderId>(providerId)
   const [draftModel, setDraftModel] = useState(model)
   const [value, setValue] = useState('')
@@ -30,12 +31,12 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
     if (open) {
       setDraftProvider(providerId)
       setDraftModel(model)
-      setValue('')
+      setValue(apiKey)
       setReveal(false)
       setRememberForTab(remember)
       setTouched(false)
     }
-  }, [open, remember, providerId, model])
+  }, [open, remember, providerId, model, apiKey])
 
   const provider = getProvider(draftProvider) ?? providers[0]
   const trimmed = value.trim()
