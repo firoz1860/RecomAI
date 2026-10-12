@@ -49,7 +49,7 @@ export const providers: ProviderInfo[] = [
     id: 'google',
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    defaultModel: 'gemini-1.5-flash',
+    defaultModel: 'gemini-3.8-flash',
     envModelVar: 'RECOMAI_GOOGLE_MODEL',
     supportsJsonMode: true,
     keyPlaceholder: 'AIza...',
