@@ -185,7 +185,7 @@ export async function generateRecommendations({ method, apiKey, provider, body }
       return errorResult(502, 'invalid_response', 'The AI returned malformed data.')
     }
 
-    const recommendations = normalize(parsed)
+    const recommendations = normalize(parsed, catalog)
     const summary =
       parsed && typeof parsed === 'object' && typeof (parsed as { summary?: unknown }).summary === 'string'
         ? (parsed as { summary: string }).summary
@@ -198,7 +198,8 @@ export async function generateRecommendations({ method, apiKey, provider, body }
 }
 
 function normalize(
-  parsed: unknown
+  parsed: unknown,
+  catalog: CatalogItem[]
 ): Array<{ productId: string; product: Record<string, unknown>; score: number; reason: string }> {
   if (!parsed || typeof parsed !== 'object') {
     return []
@@ -216,8 +217,14 @@ function normalize(
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') continue
     const record = entry as Record<string, unknown>
-    if (!record.product || typeof record.product !== 'object') continue
-    const source = record.product as Record<string, unknown>
+    let source: Record<string, unknown> | null = null
+    if (record.product && typeof record.product === 'object') {
+      source = record.product as Record<string, unknown>
+    } else if (typeof record.productId === 'string') {
+      const legacyProduct = catalog.find((item) => item.id === record.productId)
+      if (legacyProduct) source = legacyProduct as unknown as Record<string, unknown>
+    }
+    if (!source) continue
     const name = cleanText(source.name, 120)
     if (!name) continue
     const brand = cleanText(source.brand, 80) || 'Recommended product'
