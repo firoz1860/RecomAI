@@ -21,7 +21,7 @@ import type {
   SortKey
 } from '../lib/types'
 
-const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission', 'model', 'quota']
+const keyErrorCodes: RecommendationErrorCode[] = ['missing_key', 'invalid_key', 'permission', 'model']
 
 export function Home() {
   const { apiKey, hasKey, remember, saveKey, clearKey } = useApiKey()
@@ -89,21 +89,23 @@ export function Home() {
   }
 
   const code = recommendations.errorCode
+  const billingUrl = 'https://platform.openai.com/settings/organization/billing'
   const needsKey = code !== null && keyErrorCodes.includes(code)
-  const errorActionLabel = needsKey
-    ? code === 'missing_key'
-      ? 'Connect API key'
-      : code === 'quota'
-        ? 'Use a different key'
-        : 'Update API key'
-    : code === 'no_matches'
-      ? undefined
-      : 'Try again'
-  const errorAction = needsKey
-    ? handleManageKey
-    : code === 'no_matches'
-      ? undefined
-      : () => startRequest(recommendations.lastPreference)
+  let errorActionLabel: string | undefined
+  let errorAction: (() => void) | undefined
+  let errorActionHref: string | undefined
+  if (needsKey) {
+    errorActionLabel = code === 'missing_key' ? 'Connect API key' : 'Update API key'
+    errorAction = handleManageKey
+  } else if (code === 'quota') {
+    errorActionLabel = 'Add credits in OpenAI'
+    errorActionHref = billingUrl
+  } else if (code === 'no_matches') {
+    errorActionLabel = undefined
+  } else {
+    errorActionLabel = 'Try again'
+    errorAction = () => startRequest(recommendations.lastPreference)
+  }
 
   return (
     <div className="min-h-screen">
@@ -155,6 +157,7 @@ export function Home() {
             message={recommendations.errorMessage}
             actionLabel={errorActionLabel}
             onAction={errorAction}
+            actionHref={errorActionHref}
             retryAfter={code === 'rate_limit' ? recommendations.retryAfter ?? undefined : undefined}
           />
         )}

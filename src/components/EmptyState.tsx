@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertIcon, SearchIcon } from './icons'
+import { AlertIcon, ExternalLinkIcon, SearchIcon } from './icons'
 
 interface EmptyStateProps {
   variant?: 'info' | 'error'
@@ -7,10 +7,22 @@ interface EmptyStateProps {
   message: string
   actionLabel?: string
   onAction?: () => void
+  actionHref?: string
   retryAfter?: number
 }
 
-export function EmptyState({ variant = 'info', title, message, actionLabel, onAction, retryAfter }: EmptyStateProps) {
+const actionClass =
+  'mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lift transition hover:bg-brand-700 focus-ring disabled:cursor-not-allowed disabled:opacity-60'
+
+export function EmptyState({
+  variant = 'info',
+  title,
+  message,
+  actionLabel,
+  onAction,
+  actionHref,
+  retryAfter
+}: EmptyStateProps) {
   const isError = variant === 'error'
   const [remaining, setRemaining] = useState(typeof retryAfter === 'number' ? retryAfter : 0)
 
@@ -42,13 +54,14 @@ export function EmptyState({ variant = 'info', title, message, actionLabel, onAc
       </span>
       <h3 className="mt-4 text-base font-semibold text-slate-900">{title}</h3>
       <p className="mt-1.5 max-w-sm text-sm text-slate-500">{message}</p>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={waiting ? undefined : onAction}
-          disabled={waiting}
-          className="mt-5 inline-flex items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lift transition hover:bg-brand-700 focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-        >
+      {actionLabel && actionHref && (
+        <a href={actionHref} target="_blank" rel="noreferrer noopener" className={actionClass}>
+          {actionLabel}
+          <ExternalLinkIcon className="h-4 w-4" />
+        </a>
+      )}
+      {actionLabel && !actionHref && onAction && (
+        <button type="button" onClick={waiting ? undefined : onAction} disabled={waiting} className={actionClass}>
           {label}
         </button>
       )}
