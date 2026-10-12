@@ -78,8 +78,17 @@ export function ApiKeyModal({ open, onClose, onSave, onClear, hasKey, remember, 
               </option>
             ))}
           </select>
-          {provider.freeTier && (
-            <p className="mt-1.5 text-xs text-emerald-600">This provider offers a free tier, so no billing is needed to start.</p>
+          <p className="mt-1.5 text-xs text-slate-500">
+            Model: <code className="font-mono">{provider.defaultModel}</code>
+          </p>
+          {provider.freeTier ? (
+            <p className="mt-1.5 text-xs text-emerald-600">
+              Free models may have rate limits or availability restrictions.
+            </p>
+          ) : (
+            <p className="mt-1.5 text-xs text-amber-700">
+              This provider may charge for API usage. Check its pricing before sending requests.
+            </p>
           )}
         </div>
 

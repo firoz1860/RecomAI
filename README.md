@@ -1,6 +1,6 @@
 # RecomAI
 
-A polished React product recommendation app. It shows a fixed local product catalog and uses a visitor supplied OpenAI API key to recommend only products from that catalog based on natural language preferences such as "I want a phone under $500".
+A polished React product recommendation app. It shows a fixed local product catalog and uses a visitor-supplied API key from a supported provider to recommend only products from that catalog based on natural language preferences such as "I want a phone under $500".
 
 The catalog is the single source of truth. The AI may return only product ids that exist in the catalog, and the app discards anything it does not recognise before rendering.
 
@@ -9,13 +9,13 @@ The catalog is the single source of truth. The AI may return only product ids th
 - Vite, React and TypeScript
 - Tailwind CSS
 - Vercel serverless function for the recommendation request
-- OpenAI SDK on the server side only
+- OpenAI-compatible SDK on the server side only
 
 ## Features
 
 - Responsive catalog of 22 fictional products across smartphones, laptops, headphones, smartwatches, tablets and accessories
 - Natural language preference input with example prompt chips
-- API key modal with a direct link to the official OpenAI key page, a password field with show and hide, and an optional remember for this tab control
+- API key modal with provider-specific links to official key pages, a password field with show and hide, and an optional remember for this tab control
 - Search, category filter and sorting
 - Product detail view
 - Up to three recommendations with a match score and a reason
@@ -31,7 +31,7 @@ npm run dev
 
 Open the local URL that Vite prints.
 
-The recommendation request calls the serverless route at `api/recommend.ts`. In local development the same endpoint logic lives in `api/recommend-core.ts` and is served by a Vite middleware plugin, so `npm run dev` and `npm run preview` both run the full recommendation flow against OpenAI with your supplied key. In production on Vercel the `api/recommend.ts` function runs the identical core. No extra tooling is required for local testing.
+The recommendation request calls the serverless route at `api/recommend.ts`. In local development the same endpoint logic lives in `api/recommend-core.ts` and is served by a Vite middleware plugin, so `npm run dev` and `npm run preview` both run the full recommendation flow against the selected provider with your supplied key. In production on Vercel the `api/recommend.ts` function runs the identical core. No extra tooling is required for local testing.
 
 ## Scripts
 
@@ -46,7 +46,7 @@ The recommendation request calls the serverless route at `api/recommend.ts`. In 
 - The key lives in React memory by default
 - If the visitor selects remember for this tab, the key is written to sessionStorage only, and it clears when the tab closes
 - localStorage is never used for the key
-- The key is sent only in the `x-openai-api-key` request header to the serverless route
+- The key is sent in the `x-api-key` header, with the selected provider in `x-provider` to the serverless route
 - The key never appears in a URL, in a server response, in logs or in the committed source
 
 ## Recommendation endpoint
@@ -62,9 +62,9 @@ Request body:
 }
 ```
 
-The OpenAI key is passed in the `x-openai-api-key` header.
+The selected provider key is passed in the `x-api-key` header, and the provider ID is passed in `x-provider`.
 
-The server validates the body and the key, creates an OpenAI client for that request only, asks the model for structured JSON, then validates every returned id against the supplied catalog. Unknown ids are dropped, duplicate ids are removed, scores are clamped to the range 0 to 100, and at most three recommendations are returned.
+The server validates the body and key, creates an OpenAI-compatible client for that provider and request only, asks the model for structured JSON, then validates every returned id against the supplied catalog. Unknown ids are dropped, duplicate ids are removed, scores are clamped to the range 0 to 100, and at most three recommendations are returned.
 
 Response shape:
 
@@ -84,7 +84,7 @@ Response shape:
 3. `vercel build` and `vercel deploy` to create a preview deployment
 4. Promote to production from the Vercel dashboard after review
 
-No server environment secret is required for the OpenAI key because the key is supplied per request by the visitor. The optional `RECOMAI_OPENAI_MODEL` variable overrides the model and defaults to `gpt-4o-mini`.
+No server environment secret is required for visitor keys because each selected provider key is supplied per request. The optional `RECOMAI_OPENAI_MODEL` variable overrides the model and defaults to `gpt-4o-mini`.
 
 ## Documentation
 
@@ -93,16 +93,16 @@ No server environment secret is required for the OpenAI key because the key is s
 
 ## AI providers
 
-RecomAI works with several providers. Pick one in the API key modal and paste that provider's key. Groq, Google Gemini and OpenRouter offer free tiers, so you can use the app without adding billing.
+RecomAI works with several providers. Pick one in the API key modal and paste that provider's key. OpenRouter's default Grok model is free to use; free models are rate limited and availability can change.
 
 | Provider | Default model | Free tier | Get a key |
 | --- | --- | --- | --- |
 | OpenAI | gpt-4o-mini | no | https://platform.openai.com/api-keys |
-| Groq | llama-3.3-70b-versatile | yes | https://console.groq.com/keys |
+| Groq | openai/gpt-oss-120b | no | https://console.groq.com/keys |
 | Google Gemini | gemini-1.5-flash | yes | https://aistudio.google.com/apikey |
-| OpenRouter | openai/gpt-4o-mini | yes | https://openrouter.ai/keys |
+| OpenRouter | x-ai/grok-4.1-fast:free | yes | https://openrouter.ai/keys |
 | Anthropic Claude | claude-3-5-haiku-20241022 | no | https://console.anthropic.com/settings/keys |
-| xAI Grok | grok-2-latest | no | https://console.x.ai |
+| xAI Grok | grok-4.7 | no | https://console.x.ai |
 | Mistral | mistral-small-latest | no | https://console.mistral.ai/api-keys |
 
 The key you enter is sent only in the request header and is never stored on the server. It stays in memory, or in sessionStorage when you choose remember for this tab. The provider choice is stored in localStorage as a preference, and your saved search results are cached in localStorage. The key itself is never written to localStorage.
@@ -113,17 +113,17 @@ No environment variable is required to run or deploy RecomAI, because the AI key
 
 ```
 RECOMAI_OPENAI_MODEL=gpt-4o-mini
-RECOMAI_GROQ_MODEL=llama-3.3-70b-versatile
+RECOMAI_GROQ_MODEL=openai/gpt-oss-120b
 RECOMAI_GOOGLE_MODEL=gemini-1.5-flash
-RECOMAI_OPENROUTER_MODEL=openai/gpt-4o-mini
+RECOMAI_OPENROUTER_MODEL=x-ai/grok-4.1-fast:free
 RECOMAI_ANTHROPIC_MODEL=claude-3-5-haiku-20241022
-RECOMAI_XAI_MODEL=grok-2-latest
+RECOMAI_XAI_MODEL=grok-4.7
 RECOMAI_MISTRAL_MODEL=mistral-small-latest
 ```
 
 ## Free deployment on Vercel
 
-The Vercel Hobby plan is free and runs both the static site and the serverless route.
+The Vercel Hobby plan runs both the static site and the serverless route.
 
 Using the Vercel CLI:
 
